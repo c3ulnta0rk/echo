@@ -20,7 +20,8 @@ import {
 } from "./ui/tooltip";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { AnimatedBackground } from "../../components/motion-primitives/animated-background";
+import { AnimatedBackground } from "@/components/motion-primitives/animated-background";
+
 
 const sidebarCollapsedAtom = atomWithStorage('sidebar_collapsed', true);
 
