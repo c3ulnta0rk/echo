@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="echo-logo-full.svg" alt="Echo Logo" width="200" style="margin-top: 30px;">
+</div>
+
 # Echo
 
 **A free, open source, and extensible speech-to-text application that works completely offline.**
