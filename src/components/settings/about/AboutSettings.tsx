@@ -52,7 +52,7 @@ export const AboutSettings: React.FC = () => {
           <Button
 
             size="default"
-            onClick={() => openUrl("https://github.com/cjpais/Handy")}
+            onClick={() => openUrl("https://github.com/damien-schneider/echo")}
           >
             View on GitHub
           </Button>
