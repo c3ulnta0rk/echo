@@ -7,11 +7,9 @@ static LOGGER_INIT: Once = Once::new();
 
 pub fn init() {
     LOGGER_INIT.call_once(|| {
-        env_logger::Builder::from_env(
-            Env::default().default_filter_or("info"),
-        )
-        .format_timestamp_secs()
-        .init();
+        env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+            .format_timestamp_secs()
+            .init();
     });
 }
 

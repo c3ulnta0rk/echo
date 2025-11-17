@@ -65,6 +65,7 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   debug_logging_enabled: false,
   custom_words: [],
   history_limit: 5,
+  recording_retention_period: "preserve_limit",
   mute_while_recording: false,
 };
 
@@ -118,6 +119,8 @@ const settingUpdaters: {
   clipboard_handling: (value) =>
     invoke("change_clipboard_handling_setting", { handling: value }),
   history_limit: (value) => invoke("update_history_limit", { limit: value }),
+  recording_retention_period: (value) =>
+    invoke("update_recording_retention_period", { period: value }),
   post_process_selected_prompt_id: (value) =>
     invoke("set_post_process_selected_prompt", { id: value }),
   mute_while_recording: (value) =>

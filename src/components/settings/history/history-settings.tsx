@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { SettingsGroup } from "../../ui/SettingsGroup";
+import React, { useState, useEffect, useCallback, ComponentProps } from "react";
 import { AudioPlayer } from "../../ui/AudioPlayer";
-import { Copy, Star, Check, Trash2 } from "lucide-react";
+import { Button } from "../../ui/Button";
+import { Copy, Star, Check, Trash2, FolderOpen } from "lucide-react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { cn } from "@/lib/utils";
 
 interface HistoryEntry {
   id: number;
@@ -32,18 +33,16 @@ export const HistorySettings: React.FC = () => {
   useEffect(() => {
     loadHistoryEntries();
 
-    // Listen for history update events
     const setupListener = async () => {
       const unlisten = await listen("history-updated", () => {
         console.log("History updated, reloading entries...");
         loadHistoryEntries();
       });
 
-      // Return cleanup function
       return unlisten;
     };
 
-    let unlistenPromise = setupListener();
+    const unlistenPromise = setupListener();
 
     return () => {
       unlistenPromise.then((unlisten) => {
@@ -57,7 +56,6 @@ export const HistorySettings: React.FC = () => {
   const toggleSaved = async (id: number) => {
     try {
       await invoke("toggle_history_entry_saved", { id });
-      // No need to reload here - the event listener will handle it
     } catch (error) {
       console.error("Failed to toggle saved status:", error);
     }
@@ -93,14 +91,34 @@ export const HistorySettings: React.FC = () => {
     }
   };
 
+  const openRecordingsFolder = async () => {
+    try {
+      await invoke("open_recordings_folder");
+    } catch (error) {
+      console.error("Failed to open recordings folder:", error);
+    }
+  };
+
+  const renderHistoryPanel = (content: React.ReactNode) => (
+    <div className="space-y-2">
+      <div className="px-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-xs font-medium text-text/60 uppercase tracking-wide">History</h2>
+        </div>
+        <OpenRecordingsButton onClick={openRecordingsFolder} />
+      </div>
+      <div className="bg-background border border-border/20 rounded-lg overflow-hidden">
+        {content}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <SettingsGroup title="History">
-          <div className="px-4 py-3 text-center text-text/60">
-            Loading history...
-          </div>
-        </SettingsGroup>
+        {renderHistoryPanel(
+          <div className="px-4 py-3 text-center text-text/60">Loading history...</div>,
+        )}
       </div>
     );
   }
@@ -108,29 +126,31 @@ export const HistorySettings: React.FC = () => {
   if (historyEntries.length === 0) {
     return (
       <div className="space-y-6">
-        <SettingsGroup title="History">
+        {renderHistoryPanel(
           <div className="px-4 py-3 text-center text-text/60">
             No transcriptions yet. Start recording to build your history!
-          </div>
-        </SettingsGroup>
+          </div>,
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <SettingsGroup title="History">
-        {historyEntries.map((entry) => (
-          <HistoryEntryComponent
-            key={entry.id}
-            entry={entry}
-            onToggleSaved={() => toggleSaved(entry.id)}
-            onCopyText={() => copyToClipboard(entry.transcription_text)}
-            getAudioUrl={getAudioUrl}
-            deleteAudio={deleteAudioEntry}
-          />
-        ))}
-      </SettingsGroup>
+      {renderHistoryPanel(
+        <div className="divide-y divide-border/10">
+          {historyEntries.map((entry) => (
+            <HistoryEntryComponent
+              key={entry.id}
+              entry={entry}
+              onToggleSaved={() => toggleSaved(entry.id)}
+              onCopyText={() => copyToClipboard(entry.transcription_text)}
+              getAudioUrl={getAudioUrl}
+              deleteAudio={deleteAudioEntry}
+            />
+          ))}
+        </div>,
+      )}
     </div>
   );
 };
@@ -177,7 +197,7 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   };
 
   return (
-    <div className="px-4 py-2 pb-5 flex flex-col gap-3">
+    <div className="px-4 py-4 flex flex-col gap-3">
       <div className="flex justify-between items-center">
         <p className="text-sm font-medium">{entry.title}</p>
         <div className="flex items-center gap-1">
@@ -223,3 +243,19 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     </div>
   );
 };
+
+
+
+const OpenRecordingsButton = ({ onClick, className, ...props }: ComponentProps<"button">) => (
+  <Button
+    onClick={onClick}
+    variant="secondary"
+    size="sm"
+    className={cn("flex items-center gap-2", className)}
+    title="Open recordings folder"
+    {...props}
+  >
+    <FolderOpen className="w-4 h-4" />
+    <span>Open Recordings Folder</span>
+  </Button>
+);

@@ -67,6 +67,16 @@ pub enum ClipboardHandling {
     CopyToClipboard,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingRetentionPeriod {
+    Never,
+    PreserveLimit,
+    Days3,
+    Weeks2,
+    Months3,
+}
+
 impl Default for ModelUnloadTimeout {
     fn default() -> Self {
         ModelUnloadTimeout::Never
@@ -181,6 +191,8 @@ pub struct AppSettings {
     pub word_correction_threshold: f64,
     #[serde(default = "default_history_limit")]
     pub history_limit: usize,
+    #[serde(default = "default_recording_retention_period")]
+    pub recording_retention_period: RecordingRetentionPeriod,
     #[serde(default)]
     pub paste_method: PasteMethod,
     #[serde(default)]
@@ -242,6 +254,10 @@ fn default_word_correction_threshold() -> f64 {
 
 fn default_history_limit() -> usize {
     5
+}
+
+fn default_recording_retention_period() -> RecordingRetentionPeriod {
+    RecordingRetentionPeriod::PreserveLimit
 }
 
 fn default_audio_feedback_volume() -> f32 {
@@ -367,6 +383,7 @@ pub fn get_default_settings() -> AppSettings {
         model_unload_timeout: ModelUnloadTimeout::Never,
         word_correction_threshold: default_word_correction_threshold(),
         history_limit: default_history_limit(),
+        recording_retention_period: default_recording_retention_period(),
         paste_method: PasteMethod::default(),
         clipboard_handling: ClipboardHandling::default(),
         post_process_provider_id: default_post_process_provider_id(),
@@ -434,8 +451,7 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
                 #[cfg(debug_assertions)]
                 println!("Found existing settings: {:?}", settings);
                 if apply_settings_migrations_from_raw(&mut settings, Some(&settings_value)) {
-                    store
-                        .set("settings", serde_json::to_value(&settings).unwrap());
+                    store.set("settings", serde_json::to_value(&settings).unwrap());
                 }
                 settings
             }
@@ -465,8 +481,7 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         match serde_json::from_value::<AppSettings>(settings_value.clone()) {
             Ok(mut settings) => {
                 if apply_settings_migrations_from_raw(&mut settings, Some(&settings_value)) {
-                    store
-                        .set("settings", serde_json::to_value(&settings).unwrap());
+                    store.set("settings", serde_json::to_value(&settings).unwrap());
                 }
                 settings
             }
@@ -508,4 +523,9 @@ pub fn get_stored_binding(app: &AppHandle, id: &str) -> ShortcutBinding {
 pub fn get_history_limit(app: &AppHandle) -> usize {
     let settings = get_settings(app);
     settings.history_limit
+}
+
+pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeriod {
+    let settings = get_settings(app);
+    settings.recording_retention_period
 }

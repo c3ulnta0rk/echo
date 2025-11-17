@@ -4,6 +4,7 @@ pub mod audio_toolkit;
 mod clipboard;
 mod commands;
 mod llm_client;
+mod logging;
 mod managers;
 mod overlay;
 mod settings;
@@ -11,7 +12,6 @@ mod shortcut;
 mod startup;
 mod tray;
 mod utils;
-mod logging;
 mod window_effects;
 
 use managers::audio::AudioRecordingManager;
@@ -241,6 +241,7 @@ pub fn run() {
             startup::mark_frontend_ready,
             commands::cancel_operation,
             commands::get_app_dir_path,
+            commands::open_recordings_folder,
             commands::models::get_available_models,
             commands::models::get_model_info,
             commands::models::download_model,
@@ -270,7 +271,8 @@ pub fn run() {
             commands::history::toggle_history_entry_saved,
             commands::history::get_audio_file_path,
             commands::history::delete_history_entry,
-            commands::history::update_history_limit
+            commands::history::update_history_limit,
+            commands::history::update_recording_retention_period
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
