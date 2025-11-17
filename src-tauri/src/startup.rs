@@ -8,6 +8,7 @@ use tokio::time;
 // before resetting window elevation. Adjust with caution.
 const MACOS_WINDOW_FOREGROUND_DELAY_MS: u64 = 200;
 use tauri::{AppHandle, Manager, State};
+use log::{error, warn};
 
 #[derive(Default)]
 pub struct StartupState {
@@ -24,20 +25,20 @@ pub fn show_main_window(app: &AppHandle) {
         #[cfg(target_os = "macos")]
         {
             if let Err(e) = app.set_activation_policy(tauri::ActivationPolicy::Regular) {
-                eprintln!("Failed to set activation policy to Regular: {}", e);
+                error!("Failed to set activation policy to Regular: {}", e);
             }
             // Temporarily keep the window on top to fight macOS z-order jumps
             if let Err(e) = main_window.set_always_on_top(true) {
-                eprintln!("Failed to elevate window temporarily: {}", e);
+                warn!("Failed to elevate window temporarily: {}", e);
             }
         }
 
         if let Err(e) = main_window.show() {
-            eprintln!("Failed to show window: {}", e);
+            error!("Failed to show window: {}", e);
         }
 
         if let Err(e) = main_window.set_focus() {
-            eprintln!("Failed to focus window: {}", e);
+            error!("Failed to focus window: {}", e);
         }
 
         #[cfg(target_os = "macos")]
@@ -49,16 +50,16 @@ pub fn show_main_window(app: &AppHandle) {
                 time::sleep(Duration::from_millis(MACOS_WINDOW_FOREGROUND_DELAY_MS)).await;
                 if let Some(window) = app_handle.get_webview_window(&window_label) {
                     if let Err(e) = window.set_always_on_top(false) {
-                        eprintln!("Failed to reset always_on_top: {}", e);
+                        warn!("Failed to reset always_on_top: {}", e);
                     }
                     if let Err(e) = window.set_focus() {
-                        eprintln!("Failed to refocus window after elevation reset: {}", e);
+                        warn!("Failed to refocus window after elevation reset: {}", e);
                     }
                 }
             });
         }
     } else {
-        eprintln!("Main window not found.");
+        error!("Main window not found.");
     }
 }
 

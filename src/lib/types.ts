@@ -93,6 +93,7 @@ export const SettingsSchema = z.object({
   debug_mode: z.boolean(),
   beta_features_enabled: z.boolean().optional().default(false),
   debug_logging_enabled: z.boolean().optional().default(false),
+  log_level: z.number().int().min(1).max(5).optional().default(2),
   custom_words: z.array(z.string()).optional().default([]),
   model_unload_timeout: ModelUnloadTimeoutSchema.optional().default("never"),
   word_correction_threshold: z.number().optional().default(0.18),

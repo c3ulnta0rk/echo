@@ -1,6 +1,7 @@
 import React from "react";
 import { WordCorrectionThreshold } from "./word-correction-threshold";
 import { SettingsGroup } from "../../ui/SettingsGroup";
+import { LogDirectory, LogLevelSelector } from "./index";
 import { HistoryLimit } from "../history-limit";
 import { AlwaysOnMicrophone } from "../always-on-microphone";
 import { SoundPicker } from "../sound-picker";
@@ -21,6 +22,8 @@ export const DebugSettings = () => {
         <RecordingRetentionPeriodSelector descriptionMode="tooltip" grouped={true} />
         <AlwaysOnMicrophone descriptionMode="tooltip" grouped={true} />
         <ClamshellMicrophoneSelector descriptionMode="tooltip" grouped={true} />
+        <LogDirectory descriptionMode="tooltip" grouped={true} />
+        <LogLevelSelector descriptionMode="tooltip" grouped={true} />
         <MuteWhileRecording descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
     </div>

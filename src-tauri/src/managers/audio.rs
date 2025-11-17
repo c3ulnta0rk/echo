@@ -321,7 +321,7 @@ impl AudioRecordingManager {
             // Ensure microphone is open in on-demand mode
             if matches!(*self.mode.lock().unwrap(), MicrophoneMode::OnDemand) {
                 if let Err(e) = self.start_microphone_stream() {
-                    eprintln!("Failed to open microphone stream: {e}");
+                    log::error!("Failed to open microphone stream: {e}");
                     return false;
                 }
             }
@@ -336,7 +336,7 @@ impl AudioRecordingManager {
                     return true;
                 }
             }
-            eprintln!("Recorder not available");
+            log::error!("Recorder not available");
             false
         } else {
             false
@@ -366,12 +366,12 @@ impl AudioRecordingManager {
                     match rec.stop() {
                         Ok(buf) => buf,
                         Err(e) => {
-                            eprintln!("stop() failed: {e}");
+                            log::error!("stop() failed: {e}");
                             Vec::new()
                         }
                     }
                 } else {
-                    eprintln!("Recorder not available");
+                    log::error!("Recorder not available");
                     Vec::new()
                 };
 
@@ -385,7 +385,7 @@ impl AudioRecordingManager {
 
                 // Pad if very short
                 let s_len = samples.len();
-                // println!("Got {} samples", { s_len });
+                debug!("Got {} samples", { s_len });
                 if s_len < WHISPER_SAMPLE_RATE && s_len > 0 {
                     let mut padded = samples;
                     padded.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);

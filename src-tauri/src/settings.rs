@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::AppHandle;
+use log::{debug, warn};
+use tauri_plugin_log::LogLevel;
 use tauri_plugin_store::StoreExt;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -185,6 +187,8 @@ pub struct AppSettings {
     pub beta_features_enabled: bool,
     #[serde(default = "default_debug_logging_enabled")]
     pub debug_logging_enabled: bool,
+    #[serde(default = "default_log_level")]
+    pub log_level: LogLevel,
     #[serde(default)]
     pub custom_words: Vec<String>,
     #[serde(default)]
@@ -280,6 +284,10 @@ fn default_beta_features_enabled() -> bool {
 
 fn default_debug_logging_enabled() -> bool {
     false
+}
+
+fn default_log_level() -> LogLevel {
+    LogLevel::Info
 }
 
 fn default_post_process_providers() -> Vec<PostProcessProvider> {
@@ -382,6 +390,7 @@ pub fn get_default_settings() -> AppSettings {
         debug_mode: false,
         beta_features_enabled: default_beta_features_enabled(),
         debug_logging_enabled: default_debug_logging_enabled(),
+        log_level: default_log_level(),
         custom_words: Vec::new(),
         model_unload_timeout: ModelUnloadTimeout::Never,
         word_correction_threshold: default_word_correction_threshold(),
@@ -452,14 +461,14 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         match serde_json::from_value::<AppSettings>(settings_value.clone()) {
             Ok(mut settings) => {
                 #[cfg(debug_assertions)]
-                println!("Found existing settings: {:?}", settings);
+                debug!("Found existing settings: {:?}", settings);
                 if apply_settings_migrations_from_raw(&mut settings, Some(&settings_value)) {
                     store.set("settings", serde_json::to_value(&settings).unwrap());
                 }
                 settings
             }
             Err(e) => {
-                println!("Failed to parse settings: {}", e);
+                warn!("Failed to parse settings: {}", e);
                 // Fall back to default settings if parsing fails
                 let default_settings = get_default_settings();
                 store.set("settings", serde_json::to_value(&default_settings).unwrap());

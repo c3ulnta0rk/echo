@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   debug_mode: false,
   beta_features_enabled: false,
   debug_logging_enabled: false,
+  log_level: 2,
   custom_words: [],
   history_limit: 5,
   recording_retention_period: "preserve_limit",
@@ -116,6 +117,7 @@ const settingUpdaters: {
     invoke("change_beta_features_setting", { enabled: value }),
   debug_logging_enabled: (value) =>
     invoke("change_debug_logging_setting", { enabled: value }),
+  log_level: (value) => invoke("set_log_level", { level: value }),
   custom_words: (value) => invoke("update_custom_words", { words: value }),
   word_correction_threshold: (value) =>
     invoke("change_word_correction_threshold_setting", { threshold: value }),

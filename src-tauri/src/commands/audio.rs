@@ -179,7 +179,7 @@ pub fn play_test_sound(app: AppHandle, sound_type: String) {
         "start" => audio_feedback::SoundType::Start,
         "stop" => audio_feedback::SoundType::Stop,
         _ => {
-            eprintln!("Unknown sound type: {}", sound_type);
+            log::warn!("Unknown sound type: {}", sound_type);
             return;
         }
     };
