@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 use crate::audio_toolkit::save_wav_file;
+use crate::settings::RecordingRetentionPeriod;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HistoryEntry {
@@ -102,11 +103,6 @@ impl HistoryManager {
         post_processed_text: Option<String>,
         post_process_prompt: Option<String>,
     ) -> Result<()> {
-        // If history limit is 0, do not save at all.
-        if crate::settings::get_history_limit(&self.app_handle) == 0 {
-            return Ok(());
-        }
-
         let timestamp = Utc::now().timestamp();
         let file_name = format!("echo-{}.wav", timestamp);
         let title = self.format_timestamp_title(timestamp);
@@ -155,12 +151,54 @@ impl HistoryManager {
         Ok(())
     }
 
-    fn cleanup_old_entries(&self) -> Result<()> {
+    pub fn cleanup_old_entries(&self) -> Result<()> {
+        let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
+
+        match retention_period {
+            RecordingRetentionPeriod::Never => Ok(()),
+            RecordingRetentionPeriod::PreserveLimit => {
+                let limit = crate::settings::get_history_limit(&self.app_handle);
+                self.cleanup_by_count(limit)
+            }
+            RecordingRetentionPeriod::Days3
+            | RecordingRetentionPeriod::Weeks2
+            | RecordingRetentionPeriod::Months3 => self.cleanup_by_time(retention_period),
+        }
+    }
+
+    fn delete_entries_and_files(&self, entries: &[(i64, String)]) -> Result<usize> {
+        if entries.is_empty() {
+            return Ok(0);
+        }
+
+        let conn = self.get_connection()?;
+        let mut deleted_count = 0;
+
+        for (id, file_name) in entries {
+            conn.execute(
+                "DELETE FROM transcription_history WHERE id = ?1",
+                params![id],
+            )?;
+
+            let file_path = self.recordings_dir.join(file_name);
+            if file_path.exists() {
+                if let Err(e) = fs::remove_file(&file_path) {
+                    error!("Failed to delete WAV file {}: {}", file_name, e);
+                } else {
+                    debug!("Deleted old WAV file: {}", file_name);
+                    deleted_count += 1;
+                }
+            }
+        }
+
+        Ok(deleted_count)
+    }
+
+    fn cleanup_by_count(&self, limit: usize) -> Result<()> {
         let conn = self.get_connection()?;
 
-        // Get all entries that are not saved, ordered by timestamp desc
         let mut stmt = conn.prepare(
-            "SELECT id, file_name FROM transcription_history WHERE saved = 0 ORDER BY timestamp DESC"
+            "SELECT id, file_name FROM transcription_history WHERE saved = 0 ORDER BY timestamp DESC",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -172,29 +210,47 @@ impl HistoryManager {
             entries.push(row?);
         }
 
-        let limit = crate::settings::get_history_limit(&self.app_handle);
         if entries.len() > limit {
             let entries_to_delete = &entries[limit..];
-
-            for (id, file_name) in entries_to_delete {
-                // Delete database entry
-                conn.execute(
-                    "DELETE FROM transcription_history WHERE id = ?1",
-                    params![id],
-                )?;
-
-                // Delete WAV file
-                let file_path = self.recordings_dir.join(file_name);
-                if file_path.exists() {
-                    if let Err(e) = fs::remove_file(&file_path) {
-                        error!("Failed to delete WAV file {}: {}", file_name, e);
-                    } else {
-                        debug!("Deleted old WAV file: {}", file_name);
-                    }
-                }
+            let deleted_count = self.delete_entries_and_files(entries_to_delete)?;
+            if deleted_count > 0 {
+                debug!("Cleaned up {} old history entries by count", deleted_count);
             }
+        }
 
-            debug!("Cleaned up {} old history entries", entries_to_delete.len());
+        Ok(())
+    }
+
+    fn cleanup_by_time(&self, retention_period: RecordingRetentionPeriod) -> Result<()> {
+        let conn = self.get_connection()?;
+
+        let now = Utc::now().timestamp();
+        let cutoff_timestamp = match retention_period {
+            RecordingRetentionPeriod::Days3 => now - (3 * 24 * 60 * 60),
+            RecordingRetentionPeriod::Weeks2 => now - (2 * 7 * 24 * 60 * 60),
+            RecordingRetentionPeriod::Months3 => now - (3 * 30 * 24 * 60 * 60),
+            _ => unreachable!("cleanup_by_time called with unsupported retention period"),
+        };
+
+        let mut stmt = conn.prepare(
+            "SELECT id, file_name FROM transcription_history WHERE saved = 0 AND timestamp < ?1",
+        )?;
+
+        let rows = stmt.query_map(params![cutoff_timestamp], |row| {
+            Ok((row.get::<_, i64>("id")?, row.get::<_, String>("file_name")?))
+        })?;
+
+        let mut entries_to_delete: Vec<(i64, String)> = Vec::new();
+        for row in rows {
+            entries_to_delete.push(row?);
+        }
+
+        let deleted_count = self.delete_entries_and_files(&entries_to_delete)?;
+        if deleted_count > 0 {
+            debug!(
+                "Cleaned up {} old history entries based on retention period",
+                deleted_count
+            );
         }
 
         Ok(())
@@ -322,10 +378,5 @@ impl HistoryManager {
         } else {
             format!("Recording {}", timestamp)
         }
-    }
-
-    pub fn update_history_limit(&self) -> Result<()> {
-        self.cleanup_old_entries()?;
-        Ok(())
     }
 }

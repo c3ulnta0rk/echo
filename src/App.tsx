@@ -106,7 +106,7 @@ function App() {
     <div className={cn(
     "h-screen flex flex-col",
     osPlatform === "linux" && "bg-background",
-    osPlatform === "mac" && "bg-background/80 rounded-[26px]"
+    osPlatform === "mac" && "bg-background/85 rounded-[26px] backdrop-blur-xs"
   )} data-tauri-drag-region>
       <Toaster />
       {/* Draggable header region */}

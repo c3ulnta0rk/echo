@@ -2,13 +2,14 @@
 export { GeneralSettings } from "./general/general-settings";
 export { AdvancedSettings } from "./advanced/advanced-settings";
 export { DebugSettings } from "./debug/debug-settings";
-export { HistorySettings } from "./history/HistorySettings";
+export { HistorySettings } from "./history/history-settings";
 export { AboutSettings } from "./about/about-settings";
 export { PostProcessingSettings } from "./post-processing/post-processing-settings";
 export { ExperimentsSettings } from "./experiments/experiments-settings";
 
 // Individual setting components
 export { MicrophoneSelector } from "./microphone-selector";
+export { ClamshellMicrophoneSelector } from "./clamshell-microphone-selector";
 export { OutputDeviceSelector } from "./output-device-selector";
 export { AlwaysOnMicrophone } from "./always-on-microphone";
 export { PushToTalk } from "./push-to-talk";
@@ -22,4 +23,5 @@ export { AppDataDirectory } from "./app-data-directory";
 export { ModelUnloadTimeoutSetting } from "./model-unload-timeout";
 export { StartHidden } from "./start-hidden";
 export { HistoryLimit } from "./history-limit";
+export { RecordingRetentionPeriodSelector } from "./recording-retention-period";
 export { AutostartToggle } from "./autostart-toggle";

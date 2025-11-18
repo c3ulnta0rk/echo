@@ -15,6 +15,7 @@ use crate::audio_toolkit::{
     vad::{self, VadFrame},
     VoiceActivityDetector,
 };
+use log::{debug, error, warn};
 
 enum Cmd {
     Start,
@@ -82,7 +83,7 @@ impl AudioRecorder {
             let sample_rate = config.sample_rate().0;
             let channels = config.channels() as usize;
 
-            println!(
+            debug!(
                 "Using device: {:?}\nSample rate: {}\nChannels: {}\nFormat: {:?}",
                 thread_device.name(),
                 sample_rate,
@@ -188,14 +189,14 @@ impl AudioRecorder {
             }
 
             if sample_tx.send(output_buffer.clone()).is_err() {
-                eprintln!("Failed to send samples");
+                error!("Failed to send samples");
             }
         };
 
         device.build_input_stream(
             &config.clone().into(),
             stream_cb,
-            |err| eprintln!("Stream error: {}", err),
+            |err| warn!("Stream error: {}", err),
             None,
         )
     }

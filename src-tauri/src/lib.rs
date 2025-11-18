@@ -3,7 +3,9 @@ mod audio_feedback;
 pub mod audio_toolkit;
 mod clipboard;
 mod commands;
+mod helpers;
 mod llm_client;
+mod logging;
 mod managers;
 mod overlay;
 mod settings;
@@ -11,7 +13,6 @@ mod shortcut;
 mod startup;
 mod tray;
 mod utils;
-mod logging;
 mod window_effects;
 
 use managers::audio::AudioRecordingManager;
@@ -22,10 +23,13 @@ use startup::show_main_window;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::image::Image;
+use env_filter::Builder as EnvFilterBuilder;
 
 use tauri::tray::TrayIconBuilder;
 use tauri::Emitter;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_log::{Builder as LogBuilder, RotationStrategy, Target, TargetKind, LogLevel};
+use std::sync::atomic::{AtomicU8, Ordering};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 #[derive(Default)]
@@ -135,9 +139,43 @@ fn trigger_update_check(app: AppHandle) -> Result<(), String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub static FILE_LOG_LEVEL: AtomicU8 = AtomicU8::new(log::LevelFilter::Debug as u8);
+
+fn level_filter_from_u8(value: u8) -> log::LevelFilter {
+    match value {
+        0 => log::LevelFilter::Off,
+        1 => log::LevelFilter::Error,
+        2 => log::LevelFilter::Warn,
+        3 => log::LevelFilter::Info,
+        4 => log::LevelFilter::Debug,
+        5 => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Trace,
+    }
+}
+
+fn build_console_filter() -> env_filter::Filter {
+    let mut builder = EnvFilterBuilder::new();
+
+    match std::env::var("RUST_LOG") {
+        Ok(spec) if !spec.trim().is_empty() => {
+            if let Err(err) = builder.try_parse(&spec) {
+                log::warn!(
+                    "Ignoring invalid RUST_LOG value '{}': {}. Falling back to info-level console logging",
+                    spec,
+                    err
+                );
+                builder.filter_level(log::LevelFilter::Info);
+            }
+        }
+        _ => {
+            builder.filter_level(log::LevelFilter::Info);
+        }
+    }
+
+    builder.build()
+}
+
 pub fn run() {
-    logging::init();
-    logging::set_debug_logging(false);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -164,11 +202,40 @@ pub fn run() {
             MacosLauncher::LaunchAgent,
             Some(vec![]),
         ))
+        .plugin(
+            LogBuilder::new()
+                .level(log::LevelFilter::Trace)
+                .max_file_size(500_000)
+                .rotation_strategy(RotationStrategy::KeepOne)
+                .clear_targets()
+                .targets([
+                    // Console output respects the RUST_LOG environment variable
+                    Target::new(TargetKind::Stdout).filter({
+                        let console_filter = build_console_filter();
+                        move |metadata| console_filter.enabled(metadata)
+                    }),
+                    // File logs respect the user's settings stored in FILE_LOG_LEVEL
+                    Target::new(TargetKind::LogDir { file_name: Some("handy".into()) }).filter(|metadata| {
+                        let file_level = FILE_LOG_LEVEL.load(Ordering::Relaxed);
+                        metadata.level() <= level_filter_from_u8(file_level)
+                    }),
+                ])
+                .build(),
+        )
         .manage(Mutex::new(ShortcutToggleStates::default()))
         .manage(Mutex::new(startup::StartupState::default()))
         .setup(move |app| {
             let settings = settings::get_settings(&app.handle());
             logging::set_debug_logging(settings.debug_logging_enabled);
+            // Set initial file log level from settings
+            let file_log_level: log::LevelFilter = match settings.log_level {
+                LogLevel::Error => log::LevelFilter::Error,
+                LogLevel::Warn => log::LevelFilter::Warn,
+                LogLevel::Info => log::LevelFilter::Info,
+                LogLevel::Debug => log::LevelFilter::Debug,
+                LogLevel::Trace => log::LevelFilter::Trace,
+            };
+            FILE_LOG_LEVEL.store(file_log_level as u8, Ordering::Relaxed);
             let app_handle = app.handle().clone();
 
             startup::set_start_hidden(&app_handle, settings.start_hidden);
@@ -193,12 +260,12 @@ pub fn run() {
                         .app_handle()
                         .set_activation_policy(tauri::ActivationPolicy::Accessory);
                     if let Err(e) = res {
-                        println!("Failed to set activation policy: {}", e);
+                        log::error!("Failed to set activation policy: {}", e);
                     }
                 }
             }
             tauri::WindowEvent::ThemeChanged(theme) => {
-                println!("Theme changed to: {:?}", theme);
+                log::info!("Theme changed to: {:?}", theme);
                 // Update tray icon to match new theme, maintaining idle state
                 utils::change_tray_icon(&window.app_handle(), utils::TrayIconState::Idle);
             }
@@ -241,6 +308,7 @@ pub fn run() {
             startup::mark_frontend_ready,
             commands::cancel_operation,
             commands::get_app_dir_path,
+            commands::open_recordings_folder,
             commands::models::get_available_models,
             commands::models::get_model_info,
             commands::models::download_model,
@@ -258,11 +326,15 @@ pub fn run() {
             commands::audio::get_available_microphones,
             commands::audio::set_selected_microphone,
             commands::audio::get_selected_microphone,
+            commands::audio::set_clamshell_microphone,
+            commands::audio::get_clamshell_microphone,
             commands::audio::get_available_output_devices,
             commands::audio::set_selected_output_device,
             commands::audio::get_selected_output_device,
             commands::audio::play_test_sound,
             commands::audio::check_custom_sounds,
+            helpers::clamshell::is_clamshell,
+            helpers::clamshell::is_laptop,
             commands::transcription::set_model_unload_timeout,
             commands::transcription::get_model_load_status,
             commands::transcription::unload_model_manually,
@@ -270,7 +342,12 @@ pub fn run() {
             commands::history::toggle_history_entry_saved,
             commands::history::get_audio_file_path,
             commands::history::delete_history_entry,
-            commands::history::update_history_limit
+            commands::history::update_history_limit,
+            commands::history::update_recording_retention_period
+            ,
+            commands::get_log_dir_path,
+            commands::open_log_dir,
+            commands::set_log_level
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

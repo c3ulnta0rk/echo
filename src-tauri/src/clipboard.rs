@@ -138,7 +138,7 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let settings = get_settings(&app_handle);
     let paste_method = settings.paste_method;
 
-    println!("Using paste method: {:?}", paste_method);
+    log::info!("Using paste method: {:?}", paste_method);
 
     // Perform the paste operation
     match paste_method {

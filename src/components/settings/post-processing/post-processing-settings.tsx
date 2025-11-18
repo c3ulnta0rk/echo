@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { RefreshCcw } from "lucide-react";
 
@@ -17,9 +17,9 @@ import { usePostProcessProviderState } from "../post-processing-settings-api/use
 import { useSettings } from "../../../hooks/useSettings";
 import type { LLMPrompt } from "../../../lib/types";
 
-const DisabledNotice: React.FC<{ children: React.ReactNode }> = ({
+const DisabledNotice = ({
   children,
-}) => (
+}:{ children: React.ReactNode }) => (
   <div className="p-4 bg-muted/5 rounded-lg border border-border/20 text-center">
     <p className="text-sm text-muted-foreground">{children}</p>
   </div>
@@ -139,7 +139,7 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
   );
 };
 
-const PostProcessingSettingsPromptsComponent = () => {
+const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const { getSetting, updateSetting, isUpdating, refreshSettings } =
     useSettings();
   const [isCreating, setIsCreating] = useState(false);
@@ -396,14 +396,11 @@ const PostProcessingSettingsPromptsComponent = () => {
   );
 };
 
-export const PostProcessingSettingsApi = React.memo(
-  PostProcessingSettingsApiComponent,
-);
+export const PostProcessingSettingsApi = PostProcessingSettingsApiComponent;
 PostProcessingSettingsApi.displayName = "PostProcessingSettingsApi";
 
-export const PostProcessingSettingsPrompts = React.memo(
-  PostProcessingSettingsPromptsComponent,
-);
+export const PostProcessingSettingsPrompts =
+  PostProcessingSettingsPromptsComponent;
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
 export const PostProcessingSettings: React.FC = () => {

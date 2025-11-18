@@ -293,9 +293,9 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
           <div className="flex items-center space-x-1">
             {editingShortcutId === primaryId ? (
               <Button 
-              variant="outline"
+              variant="secondary"
               size="sm"
-              className="bg-foreground hover:bg-foreground text-background hover:text-background"
+              // className="bg-foreground hover:bg-foreground text-background hover:text-background"
               asChild>
 
               <div
@@ -307,7 +307,7 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
                 </Button>
             ) : (
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="font-semibold"
                 onClick={() => startRecording(primaryId)}

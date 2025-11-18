@@ -40,6 +40,15 @@ export type PasteMethod = z.infer<typeof PasteMethodSchema>;
 export const ClipboardHandlingSchema = z.enum(["dont_modify", "copy_to_clipboard"]);
 export type ClipboardHandling = z.infer<typeof ClipboardHandlingSchema>;
 
+export const RecordingRetentionPeriodSchema = z.enum([
+  "never",
+  "preserve_limit",
+  "days3",
+  "weeks2",
+  "months3",
+]);
+export type RecordingRetentionPeriod = z.infer<typeof RecordingRetentionPeriodSchema>;
+
 export const LLMPromptSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -76,6 +85,7 @@ export const SettingsSchema = z.object({
   selected_model: z.string(),
   always_on_microphone: z.boolean(),
   selected_microphone: z.string().nullable().optional(),
+  clamshell_microphone: z.string().nullable().optional(),
   selected_output_device: z.string().nullable().optional(),
   translate_to_english: z.boolean(),
   selected_language: z.string(),
@@ -83,10 +93,12 @@ export const SettingsSchema = z.object({
   debug_mode: z.boolean(),
   beta_features_enabled: z.boolean().optional().default(false),
   debug_logging_enabled: z.boolean().optional().default(false),
+  log_level: z.number().int().min(1).max(5).optional().default(2),
   custom_words: z.array(z.string()).optional().default([]),
   model_unload_timeout: ModelUnloadTimeoutSchema.optional().default("never"),
   word_correction_threshold: z.number().optional().default(0.18),
   history_limit: z.number().optional().default(5),
+  recording_retention_period: RecordingRetentionPeriodSchema.optional().default("preserve_limit"),
   paste_method: PasteMethodSchema.optional().default("ctrl_v"),
   clipboard_handling: ClipboardHandlingSchema.optional().default("dont_modify"),
   post_process_provider_id: z.string().optional().default("openai"),
@@ -95,11 +107,11 @@ export const SettingsSchema = z.object({
     .optional()
     .default([]),
   post_process_api_keys: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .default({}),
   post_process_models: z
-    .record(z.string())
+    .record(z.string(), z.string())
     .optional()
     .default({}),
   post_process_prompts: z.array(LLMPromptSchema).optional().default([]),

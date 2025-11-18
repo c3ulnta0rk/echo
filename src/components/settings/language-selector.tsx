@@ -35,10 +35,10 @@ const getFlagComponent = (countryCode?: string) => {
   return FlagComponent || null;
 };
 
-export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
+export const LanguageSelector  = ({
   descriptionMode = "tooltip",
   grouped = false,
-}) => {
+}:LanguageSelectorProps) => {
   const id = useId();
   const { getSetting, updateSetting, resetSetting, isUpdating } = useSettings();
   const { currentModel, loadCurrentModel } = useModels();
@@ -87,15 +87,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       disabled={isUnsupported}
       icon={<Globe className="w-4 h-4" />}
     >
+      {isUnsupported ?(
+        <p className="text-xs text-muted-foreground">
+          The selected model automatically detects the language.
+        </p>
+      ) :(
+
       <div className="flex items-center space-x-1">
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
             <Button
               id={id}
-              variant="outline"
+              variant="secondary"
               role="combobox"
               aria-expanded={isOpen}
-              className="bg-background hover:bg-background border-input w-full min-w-[200px] justify-between px-3 font-normal outline-offset-0 focus-visible:outline-[3px]"
+              className="w-full min-w-[200px] justify-between"
               disabled={isUpdating("selected_language") || isUnsupported}
             >
               {selectedLanguage ? (
@@ -165,6 +171,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           <RotateCcw className="w-5 h-5" />
         </Button>
       </div>
+      )}
+
       {isUpdating("selected_language") && (
         <div className="absolute inset-0 bg-muted/10 rounded flex items-center justify-center">
           <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>

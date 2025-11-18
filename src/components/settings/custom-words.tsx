@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { BookText } from "lucide-react";
+import { BookText, PlusIcon, XIcon } from "lucide-react";
 import { useSettings } from "../../hooks/useSettings";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
+import { ButtonGroup } from "../ui/button-group";
 import { SettingContainer } from "../ui/SettingContainer";
 
 interface CustomWordsProps {
@@ -10,8 +11,7 @@ interface CustomWordsProps {
   grouped?: boolean;
 }
 
-export const CustomWords: React.FC<CustomWordsProps> = React.memo(
-  ({ descriptionMode = "tooltip", grouped = false }) => {
+export const CustomWords = ({ descriptionMode = "tooltip", grouped = false }: CustomWordsProps) => {
     const { getSetting, updateSetting, isUpdating } = useSettings();
     const [newWord, setNewWord] = useState("");
     const customWords = getSetting("custom_words") || [];
@@ -53,10 +53,11 @@ export const CustomWords: React.FC<CustomWordsProps> = React.memo(
           grouped={grouped}
           icon={<BookText className="w-4 h-4" />}
         >
-          <div className="flex items-center gap-2">
+          <ButtonGroup className="w-full">
             <Input
               type="text"
-              className="max-w-40"
+              variant="button"
+              className="min-w-0"
               value={newWord}
               onChange={(e) => setNewWord(e.target.value)}
               onKeyDown={handleKeyPress}
@@ -72,45 +73,32 @@ export const CustomWords: React.FC<CustomWordsProps> = React.memo(
                 isUpdating("custom_words")
               }
               variant="default"
-              size="default"
+              size="icon"
             >
-              Add
+              <PlusIcon className="w-4 h-4" />
             </Button>
-          </div>
+          </ButtonGroup>
         </SettingContainer>
         {customWords.length > 0 && (
-          <div
-            className={`px-4 p-2 ${grouped ? "" : "rounded-lg border border-border/20"} flex flex-wrap gap-1`}
-          >
-            {customWords.map((word) => (
-              <Button
-                key={word}
-                onClick={() => handleRemoveWord(word)}
-                disabled={isUpdating("custom_words")}
-                variant="ghost"
-                size="xs"
-                className="gap-1 text-muted-foreground hover:text-foreground"
-                aria-label={`Remove ${word}`}
-              >
-                <span>{word}</span>
-                <svg
-                  className="w-3 h-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+          <div className={`px-4 p-2 ${grouped ? "" : "rounded-lg border border-border/20"}`}>
+            <ButtonGroup className="w-full flex-wrap gap-1">
+              {customWords.map((word) => (
+                <Button
+                  key={word}
+                  onClick={() => handleRemoveWord(word)}
+                  disabled={isUpdating("custom_words")}
+                  variant="ghost"
+                  size="xs"
+                  className="gap-1 text-muted-foreground hover:text-foreground"
+                  aria-label={`Remove ${word}`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </Button>
-            ))}
+                  <span>{word}</span>
+                  <XIcon className="w-3 h-3" />
+                </Button>
+              ))}
+            </ButtonGroup>
           </div>
         )}
       </>
     );
-  },
-);
+  };

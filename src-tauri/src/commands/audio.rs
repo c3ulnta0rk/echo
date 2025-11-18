@@ -100,10 +100,36 @@ pub fn set_selected_microphone(app: AppHandle, device_name: String) -> Result<()
 }
 
 #[tauri::command]
+pub fn set_clamshell_microphone(app: AppHandle, device_name: String) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.clamshell_microphone = if device_name == "default" {
+        None
+    } else {
+        Some(device_name)
+    };
+    write_settings(&app, settings);
+
+    // Restart the recorder if necessary so we pick up the new device
+    let rm = app.state::<Arc<AudioRecordingManager>>();
+    rm.update_selected_device()
+        .map_err(|e| format!("Failed to update clamshell device: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_selected_microphone(app: AppHandle) -> Result<String, String> {
     let settings = get_settings(&app);
     Ok(settings
         .selected_microphone
+        .unwrap_or_else(|| "default".to_string()))
+}
+
+#[tauri::command]
+pub fn get_clamshell_microphone(app: AppHandle) -> Result<String, String> {
+    let settings = get_settings(&app);
+    Ok(settings
+        .clamshell_microphone
         .unwrap_or_else(|| "default".to_string()))
 }
 
@@ -153,7 +179,7 @@ pub fn play_test_sound(app: AppHandle, sound_type: String) {
         "start" => audio_feedback::SoundType::Start,
         "stop" => audio_feedback::SoundType::Stop,
         _ => {
-            eprintln!("Unknown sound type: {}", sound_type);
+            log::warn!("Unknown sound type: {}", sound_type);
             return;
         }
     };

@@ -56,6 +56,7 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   autostart_enabled: false,
   push_to_talk: false,
   selected_microphone: "Default",
+  clamshell_microphone: "Default",
   selected_output_device: "Default",
   translate_to_english: false,
   selected_language: "auto",
@@ -63,8 +64,10 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   debug_mode: false,
   beta_features_enabled: false,
   debug_logging_enabled: false,
+  log_level: 2,
   custom_words: [],
   history_limit: 5,
+  recording_retention_period: "preserve_limit",
   mute_while_recording: false,
 };
 
@@ -94,6 +97,10 @@ const settingUpdaters: {
     invoke("set_selected_microphone", {
       deviceName: value === "Default" ? "default" : value,
     }),
+  clamshell_microphone: (value) =>
+    invoke("set_clamshell_microphone", {
+      deviceName: value === "Default" ? "default" : value,
+    }),
   selected_output_device: (value) =>
     invoke("set_selected_output_device", {
       deviceName: value === "Default" ? "default" : value,
@@ -110,6 +117,7 @@ const settingUpdaters: {
     invoke("change_beta_features_setting", { enabled: value }),
   debug_logging_enabled: (value) =>
     invoke("change_debug_logging_setting", { enabled: value }),
+  log_level: (value) => invoke("set_log_level", { level: value }),
   custom_words: (value) => invoke("update_custom_words", { words: value }),
   word_correction_threshold: (value) =>
     invoke("change_word_correction_threshold_setting", { threshold: value }),
@@ -118,6 +126,8 @@ const settingUpdaters: {
   clipboard_handling: (value) =>
     invoke("change_clipboard_handling_setting", { handling: value }),
   history_limit: (value) => invoke("update_history_limit", { limit: value }),
+  recording_retention_period: (value) =>
+    invoke("update_recording_retention_period", { period: value }),
   post_process_selected_prompt_id: (value) =>
     invoke("set_post_process_selected_prompt", { id: value }),
   mute_while_recording: (value) =>
@@ -160,12 +170,17 @@ export const useSettingsStore = create<SettingsStore>()(
         const settings = (await store.get("settings")) as Settings;
 
         // Load additional settings that come from invoke calls
-        const [microphoneMode, selectedMicrophone, selectedOutputDevice] =
-          await Promise.allSettled([
-            invoke("get_microphone_mode"),
-            invoke("get_selected_microphone"),
-            invoke("get_selected_output_device"),
-          ]);
+        const [
+          microphoneMode,
+          selectedMicrophone,
+          clamshellMicrophone,
+          selectedOutputDevice,
+        ] = await Promise.allSettled([
+          invoke("get_microphone_mode"),
+          invoke("get_selected_microphone"),
+          invoke("get_clamshell_microphone"),
+          invoke("get_selected_output_device"),
+        ]);
 
         // Merge all settings
         let mergedSettings: Settings = {
@@ -177,6 +192,10 @@ export const useSettingsStore = create<SettingsStore>()(
           selected_microphone:
             selectedMicrophone.status === "fulfilled"
               ? (selectedMicrophone.value as string)
+              : "Default",
+          clamshell_microphone:
+            clamshellMicrophone.status === "fulfilled"
+              ? (clamshellMicrophone.value as string)
               : "Default",
           selected_output_device:
             selectedOutputDevice.status === "fulfilled"

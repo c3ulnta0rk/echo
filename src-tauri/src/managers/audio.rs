@@ -1,10 +1,87 @@
 use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
-use crate::settings::get_settings;
+use crate::helpers::clamshell;
+use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, info};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::Manager;
+
+fn set_mute(mute: bool) {
+    #[cfg(target_os = "windows")]
+    {
+        unsafe {
+            use windows::Win32::{
+                Media::Audio::{
+                    eMultimedia, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator,
+                    MMDeviceEnumerator,
+                },
+                System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED},
+            };
+
+            macro_rules! unwrap_or_return {
+                ($expr:expr) => {
+                    match $expr {
+                        Ok(val) => val,
+                        Err(_) => return,
+                    }
+                };
+            }
+
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+            let all_devices: IMMDeviceEnumerator =
+                unwrap_or_return!(CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL));
+            let default_device =
+                unwrap_or_return!(all_devices.GetDefaultAudioEndpoint(eRender, eMultimedia));
+            let volume_interface = unwrap_or_return!(
+                default_device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+            );
+
+            let _ = volume_interface.SetMute(mute, std::ptr::null());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+
+        let mute_val = if mute { "1" } else { "0" };
+        let amixer_state = if mute { "mute" } else { "unmute" };
+
+        if Command::new("wpctl")
+            .args(["set-mute", "@DEFAULT_AUDIO_SINK@", mute_val])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        if Command::new("pactl")
+            .args(["set-sink-mute", "@DEFAULT_SINK@", mute_val])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return;
+        }
+
+        let _ = Command::new("amixer")
+            .args(["set", "Master", amixer_state])
+            .output();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let script = format!(
+            "set volume output muted {}",
+            if mute { "true" } else { "false" }
+        );
+        let _ = Command::new("osascript").args(["-e", &script]).output();
+    }
+}
 
 const WHISPER_SAMPLE_RATE: usize = 16000;
 
@@ -58,7 +135,7 @@ pub struct AudioRecordingManager {
     recorder: Arc<Mutex<Option<AudioRecorder>>>,
     is_open: Arc<Mutex<bool>>,
     is_recording: Arc<Mutex<bool>>,
-    initial_volume: Arc<Mutex<Option<u8>>>,
+    did_mute: Arc<Mutex<bool>>,
 }
 
 impl AudioRecordingManager {
@@ -80,7 +157,7 @@ impl AudioRecordingManager {
             recorder: Arc::new(Mutex::new(None)),
             is_open: Arc::new(Mutex::new(false)),
             is_recording: Arc::new(Mutex::new(false)),
-            initial_volume: Arc::new(Mutex::new(None)),
+            did_mute: Arc::new(Mutex::new(false)),
         };
 
         // Always-on?  Open immediately.
@@ -91,7 +168,60 @@ impl AudioRecordingManager {
         Ok(manager)
     }
 
+    /* ---------- helper methods --------------------------------------------- */
+
+    fn get_effective_microphone_device(&self, settings: &AppSettings) -> Option<cpal::Device> {
+        let should_use_clamshell_device = if settings.clamshell_microphone.is_some() {
+            match clamshell::is_clamshell() {
+                Ok(is_clamshell) => is_clamshell,
+                Err(err) => {
+                    debug!("Failed to determine clamshell state: {}", err);
+                    false
+                }
+            }
+        } else {
+            false
+        };
+
+        let device_name = if should_use_clamshell_device {
+            settings.clamshell_microphone.as_deref()
+        } else {
+            settings.selected_microphone.as_deref()
+        }?;
+
+        match list_input_devices() {
+            Ok(devices) => devices
+                .into_iter()
+                .find(|d| d.name == device_name)
+                .map(|d| d.device),
+            Err(e) => {
+                debug!("Failed to list devices, using default: {}", e);
+                None
+            }
+        }
+    }
+
     /* ---------- microphone life-cycle -------------------------------------- */
+
+    pub fn apply_mute(&self) {
+        let settings = get_settings(&self.app_handle);
+        let mut did_mute_guard = self.did_mute.lock().unwrap();
+
+        if settings.mute_while_recording && *self.is_open.lock().unwrap() {
+            set_mute(true);
+            *did_mute_guard = true;
+            debug!("Mute applied");
+        }
+    }
+
+    pub fn remove_mute(&self) {
+        let mut did_mute_guard = self.did_mute.lock().unwrap();
+        if *did_mute_guard {
+            set_mute(false);
+            *did_mute_guard = false;
+            debug!("Mute removed");
+        }
+    }
 
     pub fn start_microphone_stream(&self) -> Result<(), anyhow::Error> {
         let mut open_flag = self.is_open.lock().unwrap();
@@ -101,16 +231,7 @@ impl AudioRecordingManager {
         }
 
         let start_time = Instant::now();
-
-        let settings = get_settings(&self.app_handle);
-        let mut initial_volume_guard = self.initial_volume.lock().unwrap();
-
-        if settings.mute_while_recording {
-            *initial_volume_guard = Some(cpvc::get_system_volume());
-            cpvc::set_system_volume(0);
-        } else {
-            *initial_volume_guard = None;
-        }
+        *self.did_mute.lock().unwrap() = false;
 
         let vad_path = self
             .app_handle
@@ -129,23 +250,9 @@ impl AudioRecordingManager {
             )?);
         }
 
-        // Get the selected device from settings
+        // Get the selected device from settings (switches in clamshell mode)
         let settings = get_settings(&self.app_handle);
-        let selected_device = if let Some(device_name) = settings.selected_microphone {
-            // Find the device by name
-            match list_input_devices() {
-                Ok(devices) => devices
-                    .into_iter()
-                    .find(|d| d.name == device_name)
-                    .map(|d| d.device),
-                Err(e) => {
-                    debug!("Failed to list devices, using default: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        let selected_device = self.get_effective_microphone_device(&settings);
 
         if let Some(rec) = recorder_opt.as_mut() {
             rec.open(selected_device)
@@ -161,16 +268,12 @@ impl AudioRecordingManager {
     }
 
     pub fn stop_microphone_stream(&self) {
+        self.remove_mute();
+
         let mut open_flag = self.is_open.lock().unwrap();
         if !*open_flag {
             return;
         }
-
-        let mut initial_volume_guard = self.initial_volume.lock().unwrap();
-        if let Some(vol) = *initial_volume_guard {
-            cpvc::set_system_volume(vol);
-        }
-        *initial_volume_guard = None;
 
         if let Some(rec) = self.recorder.lock().unwrap().as_mut() {
             // If still recording, stop first.
@@ -218,7 +321,7 @@ impl AudioRecordingManager {
             // Ensure microphone is open in on-demand mode
             if matches!(*self.mode.lock().unwrap(), MicrophoneMode::OnDemand) {
                 if let Err(e) = self.start_microphone_stream() {
-                    eprintln!("Failed to open microphone stream: {e}");
+                    log::error!("Failed to open microphone stream: {e}");
                     return false;
                 }
             }
@@ -233,7 +336,7 @@ impl AudioRecordingManager {
                     return true;
                 }
             }
-            eprintln!("Recorder not available");
+            log::error!("Recorder not available");
             false
         } else {
             false
@@ -263,16 +366,17 @@ impl AudioRecordingManager {
                     match rec.stop() {
                         Ok(buf) => buf,
                         Err(e) => {
-                            eprintln!("stop() failed: {e}");
+                            log::error!("stop() failed: {e}");
                             Vec::new()
                         }
                     }
                 } else {
-                    eprintln!("Recorder not available");
+                    log::error!("Recorder not available");
                     Vec::new()
                 };
 
                 *self.is_recording.lock().unwrap() = false;
+                self.remove_mute();
 
                 // In on-demand mode turn the mic off again
                 if matches!(*self.mode.lock().unwrap(), MicrophoneMode::OnDemand) {
@@ -281,7 +385,7 @@ impl AudioRecordingManager {
 
                 // Pad if very short
                 let s_len = samples.len();
-                // println!("Got {} samples", { s_len });
+                debug!("Got {} samples", { s_len });
                 if s_len < WHISPER_SAMPLE_RATE && s_len > 0 {
                     let mut padded = samples;
                     padded.resize(WHISPER_SAMPLE_RATE * 5 / 4, 0.0);
@@ -307,6 +411,7 @@ impl AudioRecordingManager {
             }
 
             *self.is_recording.lock().unwrap() = false;
+            self.remove_mute();
 
             // In on-demand mode turn the mic off again
             if matches!(*self.mode.lock().unwrap(), MicrophoneMode::OnDemand) {

@@ -85,7 +85,7 @@ export const SettingContainer: React.FC<SettingContainerProps> = ({
 
   if (descriptionMode === "tooltip") {
     return (
-      <div className={horizontalContainerClasses}>
+      <div className={cn("min-h-12",horizontalContainerClasses)}>
         <div className="max-w-2/3">
           <div className="flex items-center gap-2">
             {icon && <span className={cn("text-muted-foreground", disabled && "opacity-50")}>{icon}</span>}
