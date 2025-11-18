@@ -1,5 +1,5 @@
 import React from "react";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { RecordingRetentionPeriod } from "../../lib/types";
 import { SettingContainer } from "../ui/SettingContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/Select";

@@ -1,7 +1,7 @@
 import React from "react";
 import { Timer } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { ModelUnloadTimeout } from "../../lib/types";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { SettingContainer } from "../ui/SettingContainer";

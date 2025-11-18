@@ -2,7 +2,7 @@ import React from "react";
 import { EyeOff } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 
 interface StartHiddenProps {
   descriptionMode?: "inline" | "tooltip";

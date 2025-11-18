@@ -2,7 +2,7 @@ import React from "react";
 import { ClipboardCopy } from "lucide-react";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import type { ClipboardHandling } from "../../lib/types";
 
 interface ClipboardHandlingProps {

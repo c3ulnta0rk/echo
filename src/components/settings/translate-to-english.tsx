@@ -3,8 +3,8 @@ import { Languages } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { Switch } from "../ui/switch";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
-import { useModels } from "../../hooks/useModels";
+import { useSettings } from "../../hooks/use-settings";
+import { useModels } from "../../hooks/use-models";
 
 interface TranslateToEnglishProps {
   descriptionMode?: "inline" | "tooltip";

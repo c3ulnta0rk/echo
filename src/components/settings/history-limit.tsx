@@ -1,5 +1,5 @@
 import React from "react";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { Input } from "../ui/Input";
 import { SettingContainer } from "../ui/SettingContainer";
 

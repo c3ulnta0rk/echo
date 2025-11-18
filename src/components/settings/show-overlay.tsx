@@ -2,7 +2,7 @@ import React from "react";
 import { Layers } from "lucide-react";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import type { OverlayPosition } from "../../lib/types";
 
 interface ShowOverlayProps {

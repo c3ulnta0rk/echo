@@ -1,6 +1,6 @@
 import React from "react";
 import { Slider } from "../../ui/Slider";
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 
 interface WordCorrectionThresholdProps {
   descriptionMode?: "tooltip" | "inline";

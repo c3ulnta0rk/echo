@@ -3,7 +3,7 @@ import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { SettingContainer } from "../ui/SettingContainer";
 import { Button } from "../ui/Button";
 import { RotateCcw, Speaker } from "lucide-react";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 
 interface OutputDeviceSelectorProps {
   descriptionMode?: "inline" | "tooltip";

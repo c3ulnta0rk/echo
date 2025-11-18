@@ -6,7 +6,7 @@ import {AccessibilityPermissions} from "./components/accessibility-permissions";
 import Footer from "./components/footer";
 import Onboarding from "./components/onboarding";
 import { Sidemenu, SidebarSection, SECTIONS_CONFIG } from "./components/sidemenu";
-import { useSettings } from "./hooks/useSettings";
+import { useSettings } from "./hooks/use-settings";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";

@@ -8,7 +8,7 @@ import {
 } from "../../lib/utils/keyboard";
 import { RotateCcw, Keyboard } from "lucide-react";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";

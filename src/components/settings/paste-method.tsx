@@ -3,7 +3,7 @@ import { Clipboard } from "lucide-react";
 import { type as getOsType } from "@tauri-apps/plugin-os";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import type { PasteMethod } from "../../lib/types";
 
 interface PasteMethodProps {

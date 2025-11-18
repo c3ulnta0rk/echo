@@ -3,8 +3,7 @@ import { Button } from "../ui/Button";
 import { NativeSelect, NativeSelectOption } from "../ui/native-select";
 import { PlayIcon } from "lucide-react";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettingsStore } from "../../stores/settings-store";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 
 interface SoundPickerProps {
   label: string;
@@ -15,9 +14,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   label,
   description,
 }) => {
-  const { getSetting, updateSetting } = useSettings();
-  const playTestSound = useSettingsStore((state) => state.playTestSound);
-  const customSounds = useSettingsStore((state) => state.customSounds);
+  const { getSetting, updateSetting, playTestSound, customSounds } = useSettings();
 
   const selectedTheme = getSetting("sound_theme") ?? "marimba";
 

@@ -6,7 +6,7 @@ import { SettingsGroup } from "../../ui/SettingsGroup";
 import { OutputDeviceSelector } from "../output-device-selector";
 import { PushToTalk } from "../push-to-talk";
 import { AudioFeedback } from "../audio-feedback";
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 import { VolumeSlider } from "../volume-slider";
 
 export const GeneralSettings: React.FC = () => {

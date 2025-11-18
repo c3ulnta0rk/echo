@@ -2,7 +2,7 @@ import React from "react";
 import { SettingsGroup } from "../../ui/SettingsGroup";
 import { SettingContainer } from "../../ui/SettingContainer";
 import { Switch } from "../../ui/switch";
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 
 export const ExperimentsSettings: React.FC = () => {
   const { getSetting, updateSetting, isUpdating } = useSettings();

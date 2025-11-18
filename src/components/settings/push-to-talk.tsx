@@ -2,7 +2,7 @@ import React from "react";
 import { Hand } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 
 interface PushToTalkProps {
   descriptionMode?: "inline" | "tooltip";

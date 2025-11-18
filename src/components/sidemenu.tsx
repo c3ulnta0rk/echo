@@ -3,7 +3,7 @@ import { Cog, FlaskConical, History, Info, Sparkles, PanelLeft, Beaker } from "l
 import { useAtom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import EchoLogo from "./icons/echo-logo";
-import { useSettings } from "../hooks/useSettings";
+import { useSettings } from "../hooks/use-settings";
 import {
   GeneralSettings,
   AdvancedSettings,

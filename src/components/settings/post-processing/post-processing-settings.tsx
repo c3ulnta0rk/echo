@@ -14,7 +14,7 @@ import { BaseUrlField } from "../post-processing-settings-api/base-url-field";
 import { ApiKeyField } from "../post-processing-settings-api/api-key-field";
 import { ModelSelect } from "../post-processing-settings-api/model-select";
 import { usePostProcessProviderState } from "../post-processing-settings-api/use-post-process-provider-state";
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 import type { LLMPrompt } from "../../../lib/types";
 
 const DisabledNotice = ({

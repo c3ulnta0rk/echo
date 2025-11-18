@@ -1,7 +1,7 @@
 import React from "react";
 import { SettingContainer } from "../../ui/SettingContainer";
 import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "../../ui/Select";
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 
 const LOG_LEVEL_OPTIONS = [
   { value: "1", label: "Error" },

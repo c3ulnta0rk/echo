@@ -1,7 +1,7 @@
 import React from "react";
 import { Volume2 } from "lucide-react";
 import { Slider } from "../ui/Slider";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 
 export const VolumeSlider: React.FC<{ disabled?: boolean }> = ({
   disabled = false,

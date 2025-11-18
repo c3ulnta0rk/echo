@@ -3,8 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { SettingContainer } from "../ui/SettingContainer";
 import { Button } from "../ui/Button";
 import { RotateCcw, Globe, ChevronsUpDown } from "lucide-react";
-import { useSettings } from "../../hooks/useSettings";
-import { useModels } from "../../hooks/useModels";
+import { useSettings } from "../../hooks/use-settings";
+import { useModels } from "../../hooks/use-models";
 import { LANGUAGES } from "../../lib/constants/languages";
 import {
   Command,

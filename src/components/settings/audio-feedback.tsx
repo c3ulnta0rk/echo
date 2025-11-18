@@ -2,7 +2,7 @@ import React from "react";
 import { Bell } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { SettingContainer } from "../ui/SettingContainer";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { VolumeSlider } from "./volume-slider";
 import { SoundPicker } from "./sound-picker";
 

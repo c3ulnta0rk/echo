@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { BookText, PlusIcon, XIcon } from "lucide-react";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/use-settings";
 import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { ButtonGroup } from "../ui/button-group";

@@ -1,4 +1,4 @@
-import { useSettings } from "../../../hooks/useSettings";
+import { useSettings } from "../../../hooks/use-settings";
 import type { PostProcessProvider } from "../../../lib/types";
 import type { ModelOption } from "./types";
 
