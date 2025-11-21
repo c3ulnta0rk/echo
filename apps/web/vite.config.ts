@@ -6,26 +6,22 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 
-export default defineConfig(({ mode }) => ({
+const config = defineConfig({
   plugins: [
     devtools(),
+    nitro(),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
     tailwindcss(),
     tanstackStart(),
-    mode === 'production' ? nitro() : null,
     viteReact({
       babel: {
         plugins: ['babel-plugin-react-compiler'],
       },
     }),
   ],
-  nitro: {
-    preset: 'node-server',
-  },
-  ssr: {
-    noExternal: ['react-reconciler', '@react-three/fiber'],
-  },
-}))
+})
+
+export default config
