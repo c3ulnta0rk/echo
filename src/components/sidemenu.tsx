@@ -151,7 +151,7 @@ export const Sidemenu = ({
                 >
                   <div className=" size-full flex h-10 px-3 w-full items-center gap-2">
 
-                  <Icon strokeWidth={1} className="size-5" />
+                  <Icon strokeWidth={2} className="size-4" />
 
                   <span className={cn("text-sm font-medium",
                     isCollapsed ? "hidden": "block"

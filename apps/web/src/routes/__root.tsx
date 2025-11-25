@@ -20,6 +20,47 @@ export const Route = createRootRoute({
       {
         title: 'Echo - Private, Offline, Fast Speech-to-Text',
       },
+      {
+        name: 'description',
+        content:
+          'Echo is a private, offline, and fast speech-to-text application. Transcribe your voice locally without sending data to the cloud.',
+      },
+      // OpenGraph meta tags
+      {
+        property: 'og:title',
+        content: 'Echo - Private, Offline, Fast Speech-to-Text',
+      },
+      {
+        property: 'og:description',
+        content:
+          'Echo is a private, offline, and fast speech-to-text application. Transcribe your voice locally without sending data to the cloud.',
+      },
+      {
+        property: 'og:image',
+        content: '/opengraph-image.png',
+      },
+      {
+        property: 'og:type',
+        content: 'website',
+      },
+      // Twitter Card meta tags
+      {
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      },
+      {
+        name: 'twitter:title',
+        content: 'Echo - Private, Offline, Fast Speech-to-Text',
+      },
+      {
+        name: 'twitter:description',
+        content:
+          'Echo is a private, offline, and fast speech-to-text application. Transcribe your voice locally without sending data to the cloud.',
+      },
+      {
+        name: 'twitter:image',
+        content: '/opengraph-image.png',
+      },
     ],
     links: [
       {
