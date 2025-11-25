@@ -7,7 +7,8 @@ export interface Language {
 export const LANGUAGES: Language[] = [
   { value: "auto", label: "Auto Detect" }, // No flag for auto
   { value: "en", label: "English", countryCode: "GB" },
-  { value: "zh", label: "Chinese", countryCode: "CN" },
+  { value: "zh-Hans", label: "Simplified Chinese", countryCode: "CN" },
+  { value: "zh-Hant", label: "Traditional Chinese", countryCode: "TW" },
   { value: "de", label: "German", countryCode: "DE" },
   { value: "es", label: "Spanish", countryCode: "ES" },
   { value: "ru", label: "Russian", countryCode: "RU" },

@@ -349,12 +349,22 @@ impl TranscriptionManager {
 
             match engine {
                 LoadedEngine::Whisper(whisper_engine) => {
-                    let params = WhisperInferenceParams {
-                        language: if settings.selected_language == "auto" {
-                            None
+                    let whisper_language = if settings.selected_language == "auto" {
+                        None
+                    } else {
+                        let normalized = if matches!(
+                            settings.selected_language.as_str(),
+                            "zh-Hans" | "zh-Hant"
+                        ) {
+                            "zh".to_string()
                         } else {
-                            Some(settings.selected_language.clone())
-                        },
+                            settings.selected_language.clone()
+                        };
+                        Some(normalized)
+                    };
+
+                    let params = WhisperInferenceParams {
+                        language: whisper_language,
                         translate: settings.translate_to_english,
                         ..Default::default()
                     };

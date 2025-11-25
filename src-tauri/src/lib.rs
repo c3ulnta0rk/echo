@@ -10,6 +10,8 @@ mod managers;
 mod overlay;
 mod settings;
 mod shortcut;
+#[cfg(unix)]
+mod signal_handle;
 mod startup;
 mod tray;
 mod utils;
@@ -31,6 +33,10 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_log::{Builder as LogBuilder, RotationStrategy, Target, TargetKind, LogLevel};
 use std::sync::atomic::{AtomicU8, Ordering};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+#[cfg(unix)]
+use signal_hook::consts::SIGUSR2;
+#[cfg(unix)]
+use signal_hook::iterator::Signals;
 
 #[derive(Default)]
 struct ShortcutToggleStates {
@@ -62,6 +68,16 @@ fn initialize_core_logic(app_handle: &AppHandle) {
 
     // Initialize the shortcuts
     shortcut::init_shortcuts(app_handle);
+
+    // Set up SIGUSR2 handler for Unix platforms
+    #[cfg(unix)]
+    {
+        if let Ok(signals) = Signals::new(&[SIGUSR2]) {
+            signal_handle::setup_signal_handler(app_handle.clone(), signals);
+        } else {
+            log::warn!("Failed to register SIGUSR2 handler");
+        }
+    }
 
     // Apply macOS Accessory policy if starting hidden
     #[cfg(target_os = "macos")]
