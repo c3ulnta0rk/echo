@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { DoubleSide, Mesh, Vector3 } from "three";
 import { useGithubData } from "@/hooks/use-github-data";
 import { motion, useInView } from "motion/react";
@@ -10,23 +10,35 @@ interface ShaderPlaneProps {
 	vertexShader: string;
 	fragmentShader: string;
 	uniforms: { [key: string]: { value: unknown } };
+	isActive: boolean;
 }
 
 function ShaderPlane({
 	vertexShader,
 	fragmentShader,
 	uniforms,
+	isActive,
 }: ShaderPlaneProps) {
 	const meshRef = useRef<Mesh>(null);
-	const { size } = useThree();
+	const { size, invalidate: requestFrame } = useThree();
 
 	useFrame((state) => {
-		if (meshRef.current) {
-			const material = meshRef.current.material;
-			material.uniforms.u_time.value = state.clock.elapsedTime * 0.5;
-			material.uniforms.u_resolution.value.set(size.width, size.height, 1.0);
-		}
+		if (!isActive || !meshRef.current) return;
+		
+		const material = meshRef.current.material;
+		material.uniforms.u_time.value = state.clock.elapsedTime * 0.5;
+		material.uniforms.u_resolution.value.set(size.width, size.height, 1.0);
+		
+		// Request next frame for continuous animation
+		requestFrame();
 	});
+
+	// Trigger initial render and continuous updates when active
+	useEffect(() => {
+		if (isActive) {
+			requestFrame();
+		}
+	}, [isActive, requestFrame]);
 
 	return (
 		<mesh ref={meshRef}>
@@ -48,6 +60,7 @@ interface ShaderBackgroundProps {
 	fragmentShader?: string;
 	uniforms?: { [key: string]: { value: unknown } };
 	className?: string;
+	isActive?: boolean;
 }
 
 function ShaderBackground({
@@ -188,6 +201,7 @@ function ShaderBackground({
   `,
 	uniforms = {},
 	className = "w-full h-full",
+	isActive = true,
 }: ShaderBackgroundProps) {
 	const shaderUniforms = useMemo(
 		() => ({
@@ -203,13 +217,19 @@ function ShaderBackground({
 			<Canvas 
                 className={className} 
                 dpr={1} 
-                frameloop="always"
-                gl={{ powerPreference: "high-performance" }}
+                frameloop="demand"
+                gl={{ 
+                    powerPreference: "high-performance",
+                    antialias: false,
+                    stencil: false,
+                    depth: false,
+                }}
             >
 				<ShaderPlane
 					vertexShader={vertexShader}
 					fragmentShader={fragmentShader}
 					uniforms={shaderUniforms}
+					isActive={isActive}
 				/>
 			</Canvas>
 		</div>
@@ -234,6 +254,7 @@ export default function Hero() {
             >
 				<ShaderBackground 
                     className="h-full w-full" 
+                    isActive={isInView}
                 />
 			</motion.div>
 
