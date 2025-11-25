@@ -7,6 +7,8 @@ import EchoFooter from '@/components/landing/footer'
 import { Architecture } from '@/components/landing/architecture'
 import { LandingFaq } from '@/components/landing/faq'
 import Stats from '@/components/landing/stats'
+import InterfaceShowcase from '@/components/landing/interface-showcase'
+import ModelsShowcase from '@/components/landing/models-showcase'
 
 export const Route = createFileRoute('/')({ component: App })
 
@@ -48,6 +50,8 @@ function App() {
       <Hero />
       <div id="features">
         <Waveform />
+        <InterfaceShowcase />
+        <ModelsShowcase />
         <ArchitectureSection />
         <Stats />
         <Features />
