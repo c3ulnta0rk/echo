@@ -105,7 +105,7 @@ export const useSettings = (): UseSettingsReturn => {
     isUpdating: (key: string) => isUpdatingMap[key],
     audioDevices,
     outputDevices,
-    audioFeedbackEnabled: settings?.audio_feedback,
+    audioFeedbackEnabled: settings?.audio_feedback ?? false,
     postProcessModelOptions,
     customSounds,
     updateSetting: (key, value) => updateSetting(key, value),

@@ -180,7 +180,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   // The fetchPostProcessModels will handle API key validation internally
 
   return {
-    enabled,
+    enabled: enabled ?? false,
     providerOptions,
     selectedProviderId,
     selectedProvider,
