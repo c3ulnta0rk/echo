@@ -1,25 +1,35 @@
 import { invoke } from "@tauri-apps/api/core";
-import { PlusIcon, RefreshCcw, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useSettings } from "../../../hooks/use-settings";
-import type { LLMPrompt } from "../../../lib/types";
-import { Button } from "../../ui/Button";
-import { Input } from "../../ui/Input";
-import { NativeSelect, NativeSelectOption } from "../../ui/native-select";
-import { SettingContainer } from "../../ui/SettingContainer";
-import { SettingsGroup } from "../../ui/SettingsGroup";
-import { Textarea } from "../../ui/Textarea";
+import {
+  CheckIcon,
+  PencilIcon,
+  PlusIcon,
+  RefreshCcw,
+  RotateCcw,
+  XIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MarkdownEditor } from "@/components/editor/markdown-editor";
+import { ApiKeyField } from "@/components/settings/post-processing-settings-api/api-key-field";
+import { BaseUrlField } from "@/components/settings/post-processing-settings-api/base-url-field";
+import { ModelSelect } from "@/components/settings/post-processing-settings-api/model-select";
+import { ProviderSelect } from "@/components/settings/post-processing-settings-api/provider-select";
+import { usePostProcessProviderState } from "@/components/settings/post-processing-settings-api/use-post-process-provider-state";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { SettingContainer } from "@/components/ui/SettingContainer";
+import { SettingsGroup } from "@/components/ui/SettingsGroup";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "../../ui/tooltip";
-import { ApiKeyField } from "../post-processing-settings-api/api-key-field";
-import { BaseUrlField } from "../post-processing-settings-api/base-url-field";
-import { ModelSelect } from "../post-processing-settings-api/model-select";
-import { ProviderSelect } from "../post-processing-settings-api/provider-select";
-import { usePostProcessProviderState } from "../post-processing-settings-api/use-post-process-provider-state";
+} from "@/components/ui/tooltip";
+import { useSettings } from "@/hooks/use-settings";
+import type { LLMPrompt } from "@/lib/types";
 
 const DisabledNotice = ({ children }: { children: React.ReactNode }) => (
   <div className="rounded-lg border border-border/20 bg-muted/5 p-4 text-center">
@@ -27,7 +37,7 @@ const DisabledNotice = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-const PostProcessingSettingsApiComponent: React.FC = () => {
+const PostProcessingSettingsApiComponent = () => {
   const state = usePostProcessProviderState();
   const [localBaseUrl, setLocalBaseUrl] = useState(state.baseUrl);
 
@@ -202,12 +212,14 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
   );
 };
 
-const PostProcessingSettingsPromptsComponent: React.FC = () => {
+const PostProcessingSettingsPromptsComponent = () => {
   const { getSetting, updateSetting, isUpdating, refreshSettings } =
     useSettings();
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const betaEnabled = getSetting("beta_features_enabled") ?? false;
   const prompts = getSetting("post_process_prompts") || [];
@@ -232,10 +244,19 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     selectedPrompt?.prompt,
   ]);
 
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [isEditingName]);
+
   const handlePromptSelect = (promptId: string | null) => {
     if (!promptId) return;
     updateSetting("post_process_selected_prompt_id", promptId);
     setIsCreating(false);
+    setIsEditingName(false);
   };
 
   const handleCreatePrompt = async () => {
@@ -251,6 +272,29 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
       setIsCreating(false);
     } catch (error) {
       console.error("Failed to create prompt:", error);
+    }
+  };
+
+  const handleSaveNameEdit = async () => {
+    if (!(selectedPromptId && draftName.trim())) return;
+
+    try {
+      await invoke("update_post_process_prompt", {
+        id: selectedPromptId,
+        name: draftName.trim(),
+        prompt: selectedPrompt?.prompt ?? draftText.trim(),
+      });
+      await refreshSettings();
+      setIsEditingName(false);
+    } catch (error) {
+      console.error("Failed to update prompt name:", error);
+    }
+  };
+
+  const handleCancelNameEdit = () => {
+    setIsEditingName(false);
+    if (selectedPrompt) {
+      setDraftName(selectedPrompt.name);
     }
   };
 
@@ -276,6 +320,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
       await invoke("delete_post_process_prompt", { id: promptId });
       await refreshSettings();
       setIsCreating(false);
+      setIsEditingName(false);
     } catch (error) {
       console.error("Failed to delete prompt:", error);
     }
@@ -294,8 +339,16 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
 
   const handleStartCreate = () => {
     setIsCreating(true);
+    setIsEditingName(false);
     setDraftName("");
     setDraftText("");
+  };
+
+  const handleStartEditName = () => {
+    if (selectedPrompt) {
+      setDraftName(selectedPrompt.name);
+      setIsEditingName(true);
+    }
   };
 
   if (!betaEnabled) {
@@ -308,14 +361,12 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   }
 
   const hasPrompts = prompts.length > 0;
-  const isDirty =
-    !!selectedPrompt &&
-    (draftName.trim() !== selectedPrompt.name ||
-      draftText.trim() !== selectedPrompt.prompt.trim());
+  const isPromptTextDirty =
+    !!selectedPrompt && draftText.trim() !== selectedPrompt.prompt.trim();
 
   return (
     <SettingContainer
-      description="Select a template for refining transcriptions or create a new one. Use ${output} inside the prompt text to reference the captured transcript."
+      description="Select a template for refining transcriptions or create a new one. Type @output inside the prompt to reference the captured transcript."
       descriptionMode="tooltip"
       grouped={true}
       layout="stacked"
@@ -323,31 +374,106 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     >
       <div className="space-y-3">
         <div className="flex gap-2">
-          <NativeSelect
-            className="flex-1"
-            disabled={
-              isUpdating("post_process_selected_prompt_id") ||
-              isCreating ||
-              prompts.length === 0
-            }
-            onChange={(e) => handlePromptSelect(e.target.value)}
-            value={selectedPromptId || ""}
-          >
-            <NativeSelectOption disabled value="">
-              {prompts.length === 0
-                ? "No prompts available"
-                : "Select a prompt"}
-            </NativeSelectOption>
-            {prompts.map((p) => (
-              <NativeSelectOption key={p.id} value={p.id}>
-                {p.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          {isEditingName && selectedPrompt ? (
+            <div className="flex flex-1 items-center gap-1">
+              <Input
+                className="flex-1"
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSaveNameEdit();
+                  } else if (e.key === "Escape") {
+                    handleCancelNameEdit();
+                  }
+                }}
+                placeholder="Enter prompt name"
+                ref={nameInputRef}
+                type="text"
+                value={draftName}
+              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      disabled={!draftName.trim()}
+                      onClick={handleSaveNameEdit}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <CheckIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Save name</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={handleCancelNameEdit}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <XIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Cancel</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          ) : (
+            <>
+              <NativeSelect
+                className="flex-1"
+                disabled={
+                  isUpdating("post_process_selected_prompt_id") ||
+                  isCreating ||
+                  prompts.length === 0
+                }
+                onChange={(e) => handlePromptSelect(e.target.value)}
+                value={selectedPromptId || ""}
+                wrapperClassName="w-full"
+              >
+                <NativeSelectOption disabled value="">
+                  {prompts.length === 0
+                    ? "No prompts available"
+                    : "Select a prompt"}
+                </NativeSelectOption>
+                {prompts.map((p) => (
+                  <NativeSelectOption key={p.id} value={p.id}>
+                    {p.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {selectedPrompt && !isCreating && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className="shrink-0"
+                        onClick={handleStartEditName}
+                        size="icon"
+                        variant="secondary"
+                      >
+                        <PencilIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Rename prompt</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </>
+          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button disabled={isCreating} onClick={handleStartCreate}>
+                <Button
+                  className="shrink-0"
+                  disabled={isCreating || isEditingName}
+                  onClick={handleStartCreate}
+                  size="icon"
+                  variant="secondary"
+                >
                   <PlusIcon />
                 </Button>
               </TooltipTrigger>
@@ -359,40 +485,37 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
         {!isCreating && hasPrompts && selectedPrompt && (
           <div className="space-y-3">
             <div className="flex flex-col space-y-2">
-              <label className="font-semibold text-sm">Prompt Label</label>
-              <Input
-                onChange={(e) => setDraftName(e.target.value)}
-                placeholder="Enter prompt name"
-                type="text"
-                value={draftName}
-              />
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              <label className="font-semibold text-sm">
-                Prompt Instructions
-              </label>
-              <Textarea
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-sm">
+                  Prompt Instructions
+                </label>
+                <p className="text-muted-foreground text-xs">
+                  Write the instructions to run after transcription.
+                </p>
+              </div>
+              <MarkdownEditor
                 className="min-h-32"
-                onChange={(e) => setDraftText(e.target.value)}
-                placeholder="Write the instructions to run after transcription. Example: Improve grammar and clarity for the following text: ${output}"
+                onChange={setDraftText}
+                placeholder="Start typing..."
+                showMentionMenu
+                showToolbar
                 value={draftText}
               />
               <p className="text-muted-foreground/70 text-xs">
-                Tip: Use{" "}
+                Tip: Type{" "}
                 <code className="rounded bg-muted/20 px-1 py-0.5 text-xs">
-                  $&#123;output&#125;
+                  @output
                 </code>{" "}
-                to insert the transcribed text in your prompt.
+                to insert the transcribed text placeholder.
               </p>
             </div>
 
             <div className="flex gap-2 pt-2">
               <Button
-                disabled={!(draftName.trim() && draftText.trim() && isDirty)}
+                disabled={!isPromptTextDirty}
                 onClick={handleUpdatePrompt}
               >
-                Update Prompt
+                Save Changes
               </Button>
               <Button
                 disabled={!selectedPromptId || prompts.length <= 1}
@@ -430,20 +553,27 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
             </div>
 
             <div className="flex flex-col space-y-2">
-              <label className="font-semibold text-sm">
-                Prompt Instructions
-              </label>
-              <Textarea
-                onChange={(e) => setDraftText(e.target.value)}
-                placeholder="Write the instructions to run after transcription. Example: Improve grammar and clarity for the following text: ${output}"
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-sm">
+                  Prompt Instructions
+                </label>
+                <p className="text-muted-foreground text-xs">
+                  Write the instructions to run after transcription.
+                </p>
+              </div>
+              <MarkdownEditor
+                onChange={setDraftText}
+                placeholder="Start writing..."
+                showMentionMenu
+                showToolbar
                 value={draftText}
               />
               <p className="text-muted-foreground/70 text-xs">
-                Tip: Use{" "}
+                Tip: Type{" "}
                 <code className="rounded bg-muted/20 px-1 py-0.5 text-xs">
-                  $&#123;output&#125;
+                  @output
                 </code>{" "}
-                to insert the transcribed text in your prompt.
+                to insert the transcribed text placeholder.
               </p>
             </div>
 
@@ -465,15 +595,18 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   );
 };
 
-export const PostProcessingSettingsApi = PostProcessingSettingsApiComponent;
+export const PostProcessingSettingsApi: React.FC & {
+  displayName?: string;
+} = PostProcessingSettingsApiComponent;
 PostProcessingSettingsApi.displayName = "PostProcessingSettingsApi";
 
-export const PostProcessingSettingsPrompts =
-  PostProcessingSettingsPromptsComponent;
+export const PostProcessingSettingsPrompts: React.FC & {
+  displayName?: string;
+} = PostProcessingSettingsPromptsComponent;
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
-export const PostProcessingSettings: React.FC = () => (
-  <div className="mx-auto w-full max-w-3xl space-y-6">
+export const PostProcessingSettings = () => (
+  <div className="mx-auto w-full max-w-3xl pb-20">
     <SettingsGroup title="API (OpenAI Compatible)">
       <PostProcessingSettingsApi />
     </SettingsGroup>

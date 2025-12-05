@@ -719,6 +719,75 @@ pub fn change_mute_while_recording_setting(app: AppHandle, enabled: bool) -> Res
     Ok(())
 }
 
+#[tauri::command]
+pub fn change_input_tracking_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use crate::managers::input_tracker::InputTrackerManager;
+    use std::sync::Arc;
+
+    log::info!("[InputTracker] change_input_tracking_setting called with enabled={}", enabled);
+
+    let mut settings = settings::get_settings(&app);
+    settings.input_tracking_enabled = enabled;
+    settings::write_settings(&app, settings);
+
+    // Update the input tracker manager state
+    if let Some(manager) = app.try_state::<Arc<std::sync::Mutex<InputTrackerManager>>>() {
+        log::info!("[InputTracker] Found manager state, updating...");
+        if let Ok(mut tracker) = manager.lock() {
+            tracker.set_enabled(enabled, &app);
+        } else {
+            log::error!("[InputTracker] Failed to lock manager");
+        }
+    } else {
+        log::error!("[InputTracker] Manager not found in app state!");
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_input_tracking_excluded_apps(app: AppHandle, apps: Vec<String>) -> Result<(), String> {
+    use crate::managers::input_tracker::InputTrackerManager;
+    use std::sync::Arc;
+
+    log::info!("[InputTracker] change_input_tracking_excluded_apps called with {} apps", apps.len());
+
+    let mut settings = settings::get_settings(&app);
+    settings.input_tracking_excluded_apps = apps.clone();
+    settings::write_settings(&app, settings);
+
+    // Update the input tracker manager
+    if let Some(manager) = app.try_state::<Arc<std::sync::Mutex<InputTrackerManager>>>() {
+        if let Ok(tracker) = manager.lock() {
+            tracker.set_excluded_apps(apps);
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn change_input_tracking_idle_timeout(app: AppHandle, timeout_secs: Option<u64>) -> Result<(), String> {
+    use crate::managers::input_tracker::InputTrackerManager;
+    use std::sync::Arc;
+
+    log::info!("[InputTracker] change_input_tracking_idle_timeout called with timeout={:?}", timeout_secs);
+
+    let mut settings = settings::get_settings(&app);
+    settings.input_tracking_idle_timeout = timeout_secs;
+    settings::write_settings(&app, settings);
+
+    // Update the input tracker manager
+    if let Some(manager) = app.try_state::<Arc<std::sync::Mutex<InputTrackerManager>>>() {
+        if let Ok(tracker) = manager.lock() {
+            // 0 means disabled, None also means disabled
+            tracker.set_idle_timeout(timeout_secs.unwrap_or(0));
+        }
+    }
+
+    Ok(())
+}
+
 /// Determine whether a shortcut string contains at least one non-modifier key.
 /// We allow single non-modifier keys (e.g. "f5" or "space") but disallow
 /// modifier-only combos (e.g. "ctrl" or "ctrl+shift").

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 /*
 const loggingMiddleware = createMiddleware().server(
@@ -56,11 +56,11 @@ function Home() {
 
   const [todo, setTodo] = useState("");
 
-  const submitTodo = useCallback(async () => {
+  const submitTodo = async () => {
     todos = await addTodo({ data: todo });
     setTodo("");
     router.invalidate();
-  }, [addTodo, todo]);
+  };
 
   return (
     <div
@@ -73,7 +73,7 @@ function Home() {
       <div className="w-full max-w-2xl rounded-xl border-8 border-black/10 bg-black/50 p-8 shadow-xl backdrop-blur-md">
         <h1 className="mb-4 text-2xl">Start Server Functions - Todo Example</h1>
         <ul className="mb-4 space-y-2">
-          {todos?.map((t) => (
+          {todos?.map((t: { id: number; name: string }) => (
             <li
               className="rounded-lg border border-white/20 bg-white/10 p-3 shadow-md backdrop-blur-sm"
               key={t.id}
