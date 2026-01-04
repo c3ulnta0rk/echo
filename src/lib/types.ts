@@ -96,7 +96,6 @@ export const SettingsSchema = z.object({
   selected_language: z.string(),
   overlay_position: OverlayPositionSchema,
   debug_mode: z.boolean(),
-  beta_features_enabled: z.boolean().optional().default(false),
   debug_logging_enabled: z.boolean().optional().default(false),
   log_level: z.number().int().min(1).max(5).optional().default(2),
   custom_words: z.array(z.string()).optional().default([]),
@@ -116,6 +115,7 @@ export const SettingsSchema = z.object({
     .record(z.string(), z.string())
     .optional()
     .default({}),
+  post_process_enabled: z.boolean().optional().default(false),
   post_process_models: z.record(z.string(), z.string()).optional().default({}),
   post_process_prompts: z.array(LLMPromptSchema).optional().default([]),
   post_process_selected_prompt_id: z.string().nullable().optional(),
@@ -123,6 +123,7 @@ export const SettingsSchema = z.object({
   input_tracking_enabled: z.boolean().optional().default(false),
   input_tracking_excluded_apps: z.array(z.string()).optional().default([]),
   input_tracking_idle_timeout: z.number().nullable().optional().default(2),
+  tts_enabled: z.boolean().optional().default(false),
 });
 
 export const BindingResponseSchema = z.object({

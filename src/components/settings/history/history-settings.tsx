@@ -98,6 +98,15 @@ export const HistorySettings = () => {
     }
   };
 
+  const reprocessEntry = async (id: number) => {
+    try {
+      await invoke("reprocess_history_entry", { id });
+    } catch (error) {
+      console.error("Failed to reprocess entry:", error);
+      throw error;
+    }
+  };
+
   const openRecordingsFolder = async () => {
     try {
       await invoke("open_recordings_folder");
@@ -138,6 +147,7 @@ export const HistorySettings = () => {
             getAudioUrl={getAudioUrl}
             key={entry.id}
             onCopyText={() => copyToClipboard(entry.transcription_text)}
+            onReprocess={reprocessEntry}
             onRetranscribe={retranscribeEntry}
             onToggleSaved={() => toggleSaved(entry.id)}
           />

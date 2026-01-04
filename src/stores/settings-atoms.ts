@@ -18,13 +18,13 @@ const DEFAULT_SETTINGS: Partial<Settings> = {
   selected_language: "auto",
   overlay_position: "bottom",
   debug_mode: false,
-  beta_features_enabled: false,
   debug_logging_enabled: false,
   log_level: 2,
   custom_words: [],
   history_limit: 5,
   recording_retention_period: "preserve_limit",
   mute_while_recording: false,
+  tts_enabled: false,
 };
 
 const DEFAULT_AUDIO_DEVICE: AudioDevice = {
@@ -69,8 +69,6 @@ const settingUpdaters: {
     invoke("change_overlay_position_setting", { position: value }),
   debug_mode: (value) =>
     invoke("change_debug_mode_setting", { enabled: value }),
-  beta_features_enabled: (value) =>
-    invoke("change_beta_features_setting", { enabled: value }),
   debug_logging_enabled: (value) =>
     invoke("change_debug_logging_setting", { enabled: value }),
   log_level: (value) => invoke("set_log_level", { level: value }),
@@ -92,6 +90,8 @@ const settingUpdaters: {
     invoke("change_input_tracking_setting", { enabled: value }),
   input_tracking_excluded_apps: (value) =>
     invoke("change_input_tracking_excluded_apps", { apps: value }),
+  tts_enabled: (value) =>
+    invoke("change_tts_enabled_setting", { enabled: value }),
 };
 
 // State Atoms

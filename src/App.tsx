@@ -2,8 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { Toaster } from "sonner";
 import "./App.css";
-import Footer from "@/components/footer/footer-application";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { getNormalizedOsPlatform } from "@/lib/os";
 import { cn } from "@/lib/utils";
@@ -11,8 +9,8 @@ import { AccessibilityPermissions } from "./components/accessibility-permissions
 import Onboarding from "./components/onboarding";
 import {
   SECTIONS_CONFIG,
+  SidebarLayout,
   type SidebarSection,
-  Sidemenu,
 } from "./components/sidemenu";
 import { useSettings } from "./hooks/use-settings";
 
@@ -118,23 +116,15 @@ function App() {
       data-tauri-drag-region
     >
       <Toaster />
-      {/* Draggable header region */}
-      <div className="h-8 w-full shrink-0 select-none" data-tauri-drag-region />
-      {/* Main content area that takes remaining space */}
-      <div className="flex flex-1 overflow-hidden" data-tauri-drag-region>
-        <Sidemenu
-          activeSection={currentSection}
-          onSectionChange={setCurrentSection}
-        />
-        {/* Scrollable content area */}
-
-        <ScrollArea className="w-full *:mx-auto *:max-w-xl">
+      <SidebarLayout
+        activeSection={currentSection}
+        onSectionChange={setCurrentSection}
+      >
+        <div className="mx-auto max-w-xl">
           <AccessibilityPermissions />
           {renderSettingsContent(currentSection)}
-        </ScrollArea>
-      </div>
-      {/* Fixed footer at bottom */}
-      <Footer />
+        </div>
+      </SidebarLayout>
     </div>
   );
 }

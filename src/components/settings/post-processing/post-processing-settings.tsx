@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/native-select";
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { SettingsGroup } from "@/components/ui/SettingsGroup";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -37,9 +38,33 @@ const DisabledNotice = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+const PostProcessingEnableToggle = () => {
+  const { getSetting, updateSetting, isUpdating } = useSettings();
+  const postProcessEnabled = getSetting("post_process_enabled") ?? false;
+
+  return (
+    <SettingContainer
+      description="Enable LLM post-processing to refine transcriptions using custom prompts."
+      descriptionMode="tooltip"
+      grouped={true}
+      title="Enable Post Processing"
+    >
+      <Switch
+        checked={postProcessEnabled}
+        disabled={isUpdating("post_process_enabled")}
+        onCheckedChange={(value) =>
+          updateSetting("post_process_enabled", value)
+        }
+      />
+    </SettingContainer>
+  );
+};
+
 const PostProcessingSettingsApiComponent = () => {
   const state = usePostProcessProviderState();
+  const { getSetting } = useSettings();
   const [localBaseUrl, setLocalBaseUrl] = useState(state.baseUrl);
+  const postProcessEnabled = getSetting("post_process_enabled") ?? false;
 
   // Sync local value when saved value changes (e.g., after reset or provider change)
   useEffect(() => {
@@ -65,11 +90,10 @@ const PostProcessingSettingsApiComponent = () => {
     }
   };
 
-  if (!state.enabled) {
+  if (!postProcessEnabled) {
     return (
       <DisabledNotice>
-        Post processing is available only for beta features. Enable beta mode in
-        the Experiments section to configure providers.
+        Enable post-processing to configure API providers.
       </DisabledNotice>
     );
   }
@@ -221,7 +245,7 @@ const PostProcessingSettingsPromptsComponent = () => {
   const [draftText, setDraftText] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const betaEnabled = getSetting("beta_features_enabled") ?? false;
+  const postProcessEnabled = getSetting("post_process_enabled") ?? false;
   const prompts = getSetting("post_process_prompts") || [];
   const selectedPromptId = getSetting("post_process_selected_prompt_id") || "";
   const selectedPrompt =
@@ -351,11 +375,10 @@ const PostProcessingSettingsPromptsComponent = () => {
     }
   };
 
-  if (!betaEnabled) {
+  if (!postProcessEnabled) {
     return (
       <DisabledNotice>
-        Post processing is available only for beta features. Enable beta mode in
-        the Experiments section to configure prompts.
+        Enable post-processing to configure prompts.
       </DisabledNotice>
     );
   }
@@ -607,6 +630,10 @@ PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
 export const PostProcessingSettings = () => (
   <div className="mx-auto w-full max-w-3xl pb-20">
+    <SettingsGroup title="General">
+      <PostProcessingEnableToggle />
+    </SettingsGroup>
+
     <SettingsGroup title="API (OpenAI Compatible)">
       <PostProcessingSettingsApi />
     </SettingsGroup>

@@ -48,8 +48,6 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     postProcessModelOptions,
   } = useSettings();
 
-  const enabled = settings?.beta_features_enabled;
-
   // Settings are guaranteed to have providers after migration
   const providers = settings?.post_process_providers || [];
 
@@ -180,7 +178,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   // The fetchPostProcessModels will handle API key validation internally
 
   return {
-    enabled: enabled ?? false,
+    enabled: true,
     providerOptions,
     selectedProviderId,
     selectedProvider,

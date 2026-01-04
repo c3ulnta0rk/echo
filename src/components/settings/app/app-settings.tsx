@@ -11,7 +11,6 @@ import { PushToTalk } from "../push-to-talk";
 import { ShowOverlay } from "../show-overlay";
 import { StartHidden } from "../start-hidden";
 import { VolumeSlider } from "../volume-slider";
-import { BetaFeaturesToggle } from "./beta-features-toggle";
 
 export const AppSettings = () => {
   const { audioFeedbackEnabled } = useSettings();
@@ -21,7 +20,6 @@ export const AppSettings = () => {
       <CollapsibleSettingsGroup defaultOpen={true} title="Startup">
         <StartHidden descriptionMode="tooltip" grouped={true} />
         <AutostartToggle descriptionMode="tooltip" grouped={true} />
-        <BetaFeaturesToggle descriptionMode="tooltip" grouped={true} />
       </CollapsibleSettingsGroup>
 
       <CollapsibleSettingsGroup defaultOpen={true} title="Recording">

@@ -10,3 +10,4 @@ pub mod audio;
 pub mod general;
 pub mod input_tracking;
 pub mod post_process;
+pub mod tts;

@@ -8,5 +8,8 @@
     }
   },
   "push_to_talk": true,
-  "selected_language": "auto"
+  "audio_feedback": false,
+  "audio_feedback_volume": 1.0,
+  "selected_language": "auto",
+  "tts_enabled": false
 }

@@ -370,4 +370,28 @@ impl HistoryManager {
         let file_path = self.get_audio_file_path(file_name);
         load_wav_file(&file_path)
     }
+
+    /// Update post-processed text for a history entry
+    pub async fn update_post_processed_text(
+        &self,
+        id: i64,
+        post_processed_text: Option<String>,
+        post_process_prompt: Option<String>,
+    ) -> Result<()> {
+        let conn = self.get_connection()?;
+
+        conn.execute(
+            "UPDATE transcription_history SET post_processed_text = ?1, post_process_prompt = ?2 WHERE id = ?3",
+            params![post_processed_text, post_process_prompt, id],
+        )?;
+
+        debug!("Updated post-processed text for history entry with id: {}", id);
+
+        // Emit history updated event
+        if let Err(e) = self.app_handle.emit("history-updated", ()) {
+            error!("Failed to emit history-updated event: {}", e);
+        }
+
+        Ok(())
+    }
 }

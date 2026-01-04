@@ -2,6 +2,7 @@ use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, S
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::HistoryManager;
 use crate::managers::transcription::TranscriptionManager;
+use crate::managers::tts::TtsManager;
 use crate::overlay::{show_recording_overlay, show_transcribing_overlay};
 use crate::settings::{get_settings, AppSettings};
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -10,7 +11,7 @@ use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestUserMessageArgs,
     CreateChatCompletionRequestArgs,
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -28,11 +29,11 @@ pub trait ShortcutAction: Send + Sync {
 // Transcribe Action
 struct TranscribeAction;
 
-async fn maybe_post_process_transcription(
+pub async fn maybe_post_process_transcription(
     settings: &AppSettings,
     transcription: &str,
 ) -> Option<String> {
-    if !settings.beta_features_enabled {
+    if !settings.post_process_enabled {
         return None;
     }
 
@@ -313,6 +314,7 @@ impl ShortcutAction for TranscribeAction {
         let rm = Arc::clone(&app.state::<Arc<AudioRecordingManager>>());
         let tm = Arc::clone(&app.state::<Arc<TranscriptionManager>>());
         let hm = Arc::clone(&app.state::<Arc<HistoryManager>>());
+        let tts_manager = Arc::clone(&app.state::<Arc<TtsManager>>());
 
         change_tray_icon(app, TrayIconState::Transcribing);
         show_transcribing_overlay(app);
@@ -377,6 +379,18 @@ impl ShortcutAction for TranscribeAction {
                                         post_process_prompt = Some(prompt.prompt.clone());
                                     }
                                 }
+                            }
+
+                            // Trigger TTS if enabled and post-processing was successful
+                            if settings.tts_enabled && post_processed_text.is_some() {
+                                let tts_manager_clone = tts_manager.clone();
+                                let text_to_speak = final_text.clone();
+                                info!("Triggering TTS with text: {}", text_to_speak);
+                                std::thread::spawn(move || {
+                                    if let Err(e) = tts_manager_clone.speak(&text_to_speak) {
+                                        error!("TTS failed: {}", e);
+                                    }
+                                });
                             }
 
                             // Save to history with post-processed text and prompt

@@ -25,6 +25,7 @@ use managers::history::HistoryManager;
 use managers::input_tracker::InputTrackerManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
+use managers::tts::TtsManager;
 use startup::show_main_window;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -69,12 +70,20 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         InputTrackerManager::new(app_handle).expect("Failed to initialize input tracker manager"),
     ));
 
+    let tts_manager = Arc::new(TtsManager::new());
+    
+    // Pre-warm TTS engine on startup
+    if let Err(e) = tts_manager.initialize() {
+        log::warn!("Failed to initialize TTS engine on startup: {}", e);
+    }
+
     // Add managers to Tauri's managed state
     app_handle.manage(recording_manager.clone());
     app_handle.manage(model_manager.clone());
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(input_tracker_manager.clone());
+    app_handle.manage(tts_manager.clone());
 
     // Start input tracker if enabled in settings
     {
@@ -324,7 +333,6 @@ pub fn run() {
             shortcut::settings::general::change_selected_language_setting,
             shortcut::settings::general::change_overlay_position_setting,
             shortcut::settings::general::change_debug_mode_setting,
-            shortcut::settings::general::change_beta_features_setting,
             shortcut::settings::general::change_debug_logging_setting,
             shortcut::settings::general::change_word_correction_threshold_setting,
             shortcut::settings::general::change_paste_method_setting,
@@ -383,6 +391,7 @@ pub fn run() {
             commands::history::get_audio_file_path,
             commands::history::delete_history_entry,
             commands::history::retranscribe_history_entry,
+            commands::history::reprocess_history_entry,
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             commands::input_tracking::get_input_entries,
@@ -391,7 +400,9 @@ pub fn run() {
             commands::input_tracking::get_installed_apps,
             commands::get_log_dir_path,
             commands::open_log_dir,
-            commands::set_log_level
+            commands::set_log_level,
+            features::shortcut::settings::tts::change_tts_enabled_setting,
+            commands::tts::preview_tts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

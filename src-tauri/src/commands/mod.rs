@@ -3,6 +3,7 @@ pub mod history;
 pub mod input_tracking;
 pub mod models;
 pub mod transcription;
+pub mod tts;
 
 use crate::utils::cancel_current_operation;
 use crate::settings;

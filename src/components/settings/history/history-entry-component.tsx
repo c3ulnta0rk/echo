@@ -1,4 +1,4 @@
-import { Check, Copy, RefreshCw, Star, Trash2 } from "lucide-react";
+import { Check, Copy, RefreshCw, RotateCcw, Star, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AudioPlayer } from "@/components/ui/audio-player";
@@ -25,6 +25,7 @@ export interface HistoryEntryProps {
   onToggleSaved: () => void;
   onCopyText: () => void;
   onRetranscribe: (id: number) => Promise<void>;
+  onReprocess: (id: number) => Promise<void>;
   getAudioUrl: (fileName: string) => Promise<string | null>;
   deleteAudio: (id: number) => Promise<void>;
 }
@@ -34,6 +35,7 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   onToggleSaved,
   onCopyText,
   onRetranscribe,
+  onReprocess,
   getAudioUrl,
   deleteAudio,
 }) => {
@@ -41,6 +43,7 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const [showCopied, setShowCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isRetranscribing, setIsRetranscribing] = useState(false);
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   useEffect(() => {
     const loadAudio = async () => {
@@ -87,6 +90,20 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
     }
   };
 
+  const handleReprocess = async () => {
+    if (isReprocessing) return;
+
+    setIsReprocessing(true);
+    try {
+      await onReprocess(entry.id);
+    } catch (error) {
+      console.error("Failed to reprocess entry:", error);
+      alert("Failed to reprocess. Please try again.");
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3 px-4 py-4">
       <div className="flex items-center justify-between">
@@ -109,6 +126,23 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Retranscribe audio</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  disabled={isReprocessing}
+                  onClick={handleReprocess}
+                  size="icon-xs"
+                  variant="secondary"
+                >
+                  <RotateCcw
+                    className={isReprocessing ? "animate-spin" : ""}
+                    height={16}
+                    width={16}
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reprocess with AI & TTS</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>

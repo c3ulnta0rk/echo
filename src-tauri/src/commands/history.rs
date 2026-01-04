@@ -1,5 +1,7 @@
 use crate::managers::history::{HistoryEntry, HistoryManager};
 use crate::managers::transcription::TranscriptionManager;
+use crate::managers::tts::TtsManager;
+use crate::settings::get_settings;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
 
@@ -129,4 +131,68 @@ pub async fn update_recording_retention_period(
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn reprocess_history_entry(
+    app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    tts_manager: State<'_, Arc<TtsManager>>,
+    id: i64,
+) -> Result<String, String> {
+    use log::{error, info};
+    
+    // Get the history entry
+    let entry = history_manager
+        .get_entry_by_id(id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("History entry not found: {}", id))?;
+
+    // Use the original transcription text for reprocessing
+    let transcription = &entry.transcription_text;
+
+    let settings = get_settings(&app);
+    let mut final_text = transcription.clone();
+    let mut post_processed_text: Option<String> = None;
+    let mut post_process_prompt: Option<String> = None;
+
+    // Try post-processing
+    if let Some(processed_text) =
+        crate::actions::maybe_post_process_transcription(&settings, transcription).await
+    {
+        final_text = processed_text.clone();
+        post_processed_text = Some(processed_text);
+
+        // Get the prompt that was used
+        if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
+            if let Some(prompt) = settings
+                .post_process_prompts
+                .iter()
+                .find(|p| &p.id == prompt_id)
+            {
+                post_process_prompt = Some(prompt.prompt.clone());
+            }
+        }
+    }
+
+    // Update the history entry with the new post-processed text
+    history_manager
+        .update_post_processed_text(id, post_processed_text.clone(), post_process_prompt)
+        .await
+        .map_err(|e| format!("Failed to update history entry: {}", e))?;
+
+    // Trigger TTS if enabled and post-processing was successful
+    if settings.tts_enabled && post_processed_text.is_some() {
+        let tts_manager_clone = Arc::clone(&tts_manager);
+        let text_to_speak = final_text.clone();
+        info!("Triggering TTS for reprocessed text: {}", text_to_speak);
+        std::thread::spawn(move || {
+            if let Err(e) = tts_manager_clone.speak(&text_to_speak) {
+                error!("TTS failed: {}", e);
+            }
+        });
+    }
+
+    Ok(final_text)
 }

@@ -3,7 +3,6 @@
 export { AboutDialog } from "./about/about-dialog";
 export { AlwaysOnMicrophone } from "./always-on-microphone";
 export { AppSettings } from "./app/app-settings";
-export { BetaFeaturesToggle } from "./app/beta-features-toggle";
 export { AppDataDirectory } from "./app-data-directory";
 export { AudioFeedback } from "./audio-feedback";
 export { AutostartToggle } from "./autostart-toggle";
@@ -29,3 +28,4 @@ export { ShowOverlay } from "./show-overlay";
 export { StartHidden } from "./start-hidden";
 export { TranscriptionSettings } from "./transcription/transcription-settings";
 export { TranslateToEnglish } from "./translate-to-english";
+export { TtsSettings } from "./tts-settings";

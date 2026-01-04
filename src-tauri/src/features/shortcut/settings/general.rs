@@ -171,15 +171,6 @@ pub fn change_clipboard_handling_setting(app: AppHandle, handling: String) -> Re
     Ok(())
 }
 
-/// Change beta features setting.
-#[tauri::command]
-pub fn change_beta_features_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
-    settings.beta_features_enabled = enabled;
-    settings::write_settings(&app, settings);
-    Ok(())
-}
-
 /// Change debug logging setting.
 #[tauri::command]
 pub fn change_debug_logging_setting(app: AppHandle, enabled: bool) -> Result<(), String> {

@@ -1,5 +1,6 @@
 use log::LevelFilter;
 
+#[allow(dead_code)]
 pub fn init() {
     // initialization is handled by tauri-plugin-log via the Tauri builder
 }

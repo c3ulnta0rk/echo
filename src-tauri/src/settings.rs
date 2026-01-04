@@ -183,8 +183,6 @@ pub struct AppSettings {
     pub overlay_position: OverlayPosition,
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
-    #[serde(default = "default_beta_features_enabled")]
-    pub beta_features_enabled: bool,
     #[serde(default = "default_debug_logging_enabled")]
     pub debug_logging_enabled: bool,
     #[serde(default = "default_log_level")]
@@ -209,6 +207,8 @@ pub struct AppSettings {
     pub post_process_providers: Vec<PostProcessProvider>,
     #[serde(default = "default_post_process_api_keys")]
     pub post_process_api_keys: HashMap<String, String>,
+    #[serde(default)]
+    pub post_process_enabled: bool,
     #[serde(default = "default_post_process_models")]
     pub post_process_models: HashMap<String, String>,
     #[serde(default = "default_post_process_prompts")]
@@ -224,6 +224,16 @@ pub struct AppSettings {
     /// Idle timeout in seconds for input tracking. None or 0 means disabled (only count on app switch/click).
     #[serde(default = "default_input_tracking_idle_timeout")]
     pub input_tracking_idle_timeout: Option<u64>,
+    #[serde(default)]
+    pub tts_enabled: bool,
+}
+
+fn default_audio_feedback_volume() -> f32 {
+    0.5
+}
+
+fn default_sound_theme() -> SoundTheme {
+    SoundTheme::Marimba
 }
 
 fn default_model() -> String {
@@ -277,20 +287,8 @@ fn default_input_tracking_idle_timeout() -> Option<u64> {
     Some(2) // Default 2 seconds
 }
 
-fn default_audio_feedback_volume() -> f32 {
-    1.0
-}
-
-fn default_sound_theme() -> SoundTheme {
-    SoundTheme::Marimba
-}
-
 fn default_post_process_provider_id() -> String {
     "openai".to_string()
-}
-
-fn default_beta_features_enabled() -> bool {
-    false
 }
 
 fn default_debug_logging_enabled() -> bool {
@@ -406,7 +404,6 @@ pub fn get_default_settings() -> AppSettings {
         selected_language: "auto".to_string(),
         overlay_position: OverlayPosition::Bottom,
         debug_mode: false,
-        beta_features_enabled: default_beta_features_enabled(),
         debug_logging_enabled: default_debug_logging_enabled(),
         log_level: default_log_level(),
         custom_words: Vec::new(),
@@ -419,6 +416,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),
+        post_process_enabled: false,
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: None,
@@ -426,6 +424,7 @@ pub fn get_default_settings() -> AppSettings {
         input_tracking_enabled: false,
         input_tracking_excluded_apps: Vec::new(),
         input_tracking_idle_timeout: default_input_tracking_idle_timeout(),
+        tts_enabled: false,
     }
 }
 
@@ -454,19 +453,9 @@ impl AppSettings {
 
 fn apply_settings_migrations_from_raw(
     settings: &mut AppSettings,
-    raw_settings: Option<&serde_json::Value>,
+    _raw_settings: Option<&serde_json::Value>,
 ) -> bool {
     let mut updated = false;
-
-    if !settings.beta_features_enabled {
-        if let Some(true) = raw_settings
-            .and_then(|value| value.get("post_process_enabled"))
-            .and_then(|value| value.as_bool())
-        {
-            settings.beta_features_enabled = true;
-            updated = true;
-        }
-    }
 
     // Migration: Add Ollama provider if it doesn't exist
     if !settings.post_process_providers.iter().any(|p| p.id == "ollama") {

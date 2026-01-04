@@ -1,22 +1,11 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import {
-  AudioLines,
-  Bot,
-  Check,
-  Download,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import { Check, Download, Loader2, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
-import { PostProcessingSettingsApi } from "@/components/settings/post-processing/post-processing-settings";
+import { useEffect } from "react";
 import { ProgressBar } from "@/components/shared";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { SettingsGroup } from "@/components/ui/SettingsGroup";
-import { useSettings } from "@/hooks/use-settings";
 import type { ModelInfo } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { formatModelSize } from "@/lib/utils/format";
 import {
   availableModelsAtom,
@@ -33,8 +22,6 @@ import {
   selectModelAtom,
   setupModelListenersAtom,
 } from "@/stores/model-atoms";
-
-type ModelsTab = "whisper" | "post-processing";
 
 const getStatusColor = (status: ModelStatus): string => {
   switch (status) {
@@ -118,18 +105,37 @@ const ModelCard: React.FC<ModelCardProps> = ({
 }) => {
   const isProcessing = isDownloading || isExtracting;
 
+  let downloadSection: React.ReactNode = null;
+  if (isDownloading && downloadProgress) {
+    downloadSection = (
+      <div className="mt-3">
+        <ProgressBar
+          progress={[
+            {
+              id: model.id,
+              percentage: downloadProgress.percentage,
+              speed: downloadSpeed,
+            },
+          ]}
+          showSpeed={true}
+          size="small"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-border/20 bg-card p-4 transition-colors hover:border-border/40">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-foreground">{model.name}</h3>
-            {isActive && (
+            {isActive ? (
               <Badge className="gap-1" variant="default">
                 <Check className="h-3 w-3" />
                 Active
               </Badge>
-            )}
+            ) : null}
             {model.id === "small" && !model.is_downloaded && (
               <Badge variant="secondary">Recommended</Badge>
             )}
@@ -197,21 +203,7 @@ const ModelCard: React.FC<ModelCardProps> = ({
         </div>
       </div>
 
-      {isDownloading && downloadProgress && (
-        <div className="mt-3">
-          <ProgressBar
-            progress={[
-              {
-                id: model.id,
-                percentage: downloadProgress.percentage,
-                speed: downloadSpeed,
-              },
-            ]}
-            showSpeed={true}
-            size="small"
-          />
-        </div>
-      )}
+      {downloadSection}
     </div>
   );
 };
@@ -284,13 +276,13 @@ const WhisperModelsContent = () => {
               <p className="font-medium text-sm">
                 {getStatusLabel(modelStatus)}
               </p>
-              {currentModelId && (
+              {currentModelId ? (
                 <p className="text-muted-foreground text-xs">
                   Current:{" "}
                   {availableModels.find((m) => m.id === currentModelId)?.name ??
                     currentModelId}
                 </p>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -365,77 +357,8 @@ const WhisperModelsContent = () => {
   );
 };
 
-const PostProcessingModelsContent = () => {
-  const { getSetting } = useSettings();
-  const betaEnabled = getSetting("beta_features_enabled") ?? false;
-
-  if (!betaEnabled) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-8 text-center text-muted-foreground">
-        <Bot className="h-10 w-10 opacity-40" />
-        <div>
-          <p className="font-medium">Post Processing Disabled</p>
-          <p className="mt-1 text-sm">
-            Enable beta features in the Experiments section to configure post
-            processing models.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <SettingsGroup title="API Configuration (OpenAI Compatible)">
-      <PostProcessingSettingsApi />
-    </SettingsGroup>
-  );
-};
-
-export const ModelsSettings = () => {
-  const [activeTab, setActiveTab] = useState<ModelsTab>("whisper");
-
-  return (
-    <div className="mx-auto w-full max-w-3xl pb-20">
-      {/* Tab Toggle */}
-      <div className="mb-8 flex items-center justify-center">
-        <div className="inline-flex rounded-lg bg-muted p-1">
-          <button
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium text-sm transition-colors",
-              activeTab === "whisper"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setActiveTab("whisper")}
-            type="button"
-          >
-            <AudioLines className="h-4 w-4" />
-            Whisper
-          </button>
-          <button
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium text-sm transition-colors",
-              activeTab === "post-processing"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setActiveTab("post-processing")}
-            type="button"
-          >
-            <Bot className="h-4 w-4" />
-            Post Processing
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="min-h-0">
-        {activeTab === "whisper" ? (
-          <WhisperModelsContent />
-        ) : (
-          <PostProcessingModelsContent />
-        )}
-      </div>
-    </div>
-  );
-};
+export const ModelsSettings = () => (
+  <div className="mx-auto w-full max-w-3xl pb-20">
+    <WhisperModelsContent />
+  </div>
+);
