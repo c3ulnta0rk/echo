@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railpack.com/schema.json",
+  "steps": {
+    "build": {
+      "command": "bun run build",
+      "outputs": ["/app/.output/public", "/app/.output/server"]
+    }
+  },
+  "start": {
+    "cmd": "node /app/.output/server/index.mjs"
+  }
+}
