@@ -1,0 +1,8 @@
+{
+  "build": {
+    "command": "bun run build:web"
+  },
+  "deploy": {
+    "outputDirectory": ".output/public"
+  }
+}
