@@ -48,7 +48,9 @@ export const getKeyName = (
           return osType === "macos" ? "option" : "alt";
         case "meta":
           // Windows key on Windows/Linux, Command key on Mac
-          if (osType === "macos") return "command";
+          if (osType === "macos") {
+            return "command";
+          }
           return "super";
         default:
           return baseModifier;
@@ -160,7 +162,7 @@ export const getKeyName = (
  */
 export const formatKeyCombination = (
   combination: string,
-  osType: OSType
+  _osType: OSType
 ): string => {
   // Simply return the combination as-is since getKeyName already provides
   // the correct platform-specific key names

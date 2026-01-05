@@ -14,11 +14,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadModels();
-  }, []);
-
-  const loadModels = async () => {
+  async function loadModels() {
     try {
       const models: ModelInfo[] = await invoke("get_available_models");
       // Only show downloadable models for onboarding
@@ -27,7 +23,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ onModelSelected }) => {
       console.error("Failed to load models:", err);
       setError("Failed to load available models");
     }
-  };
+  }
+
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
 
   const handleDownloadModel = async (modelId: string) => {
     setDownloading(true);

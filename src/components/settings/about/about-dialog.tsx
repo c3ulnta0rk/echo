@@ -27,9 +27,9 @@ import { MuteWhileRecording } from "../mute-while-recording";
 import { RecordingRetentionPeriodSelector } from "../recording-retention-period";
 import { SoundPicker } from "../sound-picker";
 
-type AboutDialogProps = {
+interface AboutDialogProps {
   trigger?: React.ReactNode;
-};
+}
 
 export const AboutDialog: React.FC<AboutDialogProps> = ({ trigger }) => {
   const [version, setVersion] = useState("");

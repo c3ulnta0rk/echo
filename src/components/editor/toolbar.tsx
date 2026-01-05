@@ -59,13 +59,13 @@ export function EditorToolbar({ className }: { className?: string }) {
   );
 }
 
-type ToolbarButtonProps = {
+interface ToolbarButtonProps {
   onClick: () => void;
   icon: React.ReactNode;
   tooltip: string;
   active?: boolean;
   disabled?: boolean;
-};
+}
 
 function ToolbarButton({
   onClick,

@@ -27,25 +27,11 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
   const downloadedBytesRef = useRef(0);
   const contentLengthRef = useRef(0);
 
-  useEffect(() => {
-    checkForUpdates();
-
-    // Listen for update check events
-    const updateUnlisten = listen("check-for-updates", () => {
-      handleManualUpdateCheck();
-    });
-
-    return () => {
-      if (upToDateTimeoutRef.current) {
-        clearTimeout(upToDateTimeoutRef.current);
-      }
-      updateUnlisten.then((fn) => fn());
-    };
-  }, []);
-
   // Update checking functions
-  const checkForUpdates = async () => {
-    if (isChecking) return;
+  async function checkForUpdates() {
+    if (isChecking) {
+      return;
+    }
 
     try {
       setIsChecking(true);
@@ -73,12 +59,28 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       setIsChecking(false);
       isManualCheckRef.current = false;
     }
-  };
+  }
 
-  const handleManualUpdateCheck = () => {
+  function handleManualUpdateCheck() {
     isManualCheckRef.current = true;
     checkForUpdates();
-  };
+  }
+
+  useEffect(() => {
+    checkForUpdates();
+
+    // Listen for update check events
+    const updateUnlisten = listen("check-for-updates", () => {
+      handleManualUpdateCheck();
+    });
+
+    return () => {
+      if (upToDateTimeoutRef.current) {
+        clearTimeout(upToDateTimeoutRef.current);
+      }
+      updateUnlisten.then((fn) => fn());
+    };
+  }, [checkForUpdates, handleManualUpdateCheck]);
 
   const installUpdate = async () => {
     try {
@@ -133,15 +135,22 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
           ? "Installing..."
           : ""; // preparing handled by spinner only
     }
-    if (showUpToDate) return "Up to date";
-    if (updateAvailable) return "Update available";
+    if (showUpToDate) {
+      return "Up to date";
+    }
+    if (updateAvailable) {
+      return "Update available";
+    }
     return "Check for updates";
   };
 
   const getUpdateStatusAction = () => {
-    if (updateAvailable && !isInstalling) return installUpdate;
-    if (!(isChecking || isInstalling || updateAvailable))
+    if (updateAvailable && !isInstalling) {
+      return installUpdate;
+    }
+    if (!(isChecking || isInstalling || updateAvailable)) {
       return handleManualUpdateCheck;
+    }
     return;
   };
 

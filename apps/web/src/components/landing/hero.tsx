@@ -23,7 +23,9 @@ function ShaderPlane({
   const { size, invalidate: requestFrame } = useThree();
 
   useFrame((state) => {
-    if (!(isActive && meshRef.current)) return;
+    if (!(isActive && meshRef.current)) {
+      return;
+    }
 
     const material = meshRef.current.material;
     material.uniforms.u_time.value = state.clock.elapsedTime * 0.5;

@@ -49,7 +49,7 @@ export default function Navbar() {
   return (
     <motion.nav
       animate={{ y: 0, opacity: 1 }}
-      className="md:-translate-x-1/2 fixed inset-x-4 top-4 z-50 md:inset-x-auto md:left-1/2 md:w-full md:max-w-5xl"
+      className="fixed inset-x-4 top-4 z-50 md:inset-x-auto md:left-1/2 md:w-full md:max-w-5xl md:-translate-x-1/2"
       initial={{ y: -100, opacity: 0 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
     >

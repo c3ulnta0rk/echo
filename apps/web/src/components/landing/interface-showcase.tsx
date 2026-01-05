@@ -14,7 +14,7 @@ export default function InterfaceShowcase() {
     >
       {/* Ambient glow effect */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="-translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 h-[600px] w-[800px] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-[120px]" />
       </div>
 
       <div className="container relative z-10 mx-auto px-4">
@@ -63,7 +63,7 @@ export default function InterfaceShowcase() {
           {/* Floating feature badges */}
           <motion.div
             animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
-            className="-left-4 absolute top-1/4 hidden items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
+            className="absolute top-1/4 -left-4 hidden items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
             initial={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.6, delay: 0.6 }}
           >
@@ -75,7 +75,7 @@ export default function InterfaceShowcase() {
 
           <motion.div
             animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 }}
-            className="-right-4 absolute top-1/3 hidden items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
+            className="absolute top-1/3 -right-4 hidden items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
             initial={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.6, delay: 0.8 }}
           >
@@ -87,7 +87,7 @@ export default function InterfaceShowcase() {
 
           <motion.div
             animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            className="-bottom-4 -translate-x-1/2 absolute left-1/2 hidden items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
+            className="absolute -bottom-4 left-1/2 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-background/80 px-4 py-2 shadow-lg backdrop-blur-md lg:flex"
             initial={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.6, delay: 1 }}
           >

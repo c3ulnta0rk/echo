@@ -3,10 +3,10 @@ import { SettingContainer } from "@/components/ui/SettingContainer";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/hooks/use-settings";
 
-type InputTrackingToggleProps = {
+interface InputTrackingToggleProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
-};
+}
 
 export const InputTrackingToggle = ({
   descriptionMode = "tooltip",

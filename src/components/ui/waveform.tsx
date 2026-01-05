@@ -39,7 +39,9 @@ export const Waveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -59,7 +61,9 @@ export const Waveform = ({
 
     const renderWaveform = () => {
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        return;
+      }
 
       const rect = canvas.getBoundingClientRect();
       ctx.clearRect(0, 0, rect.width, rect.height);
@@ -125,10 +129,14 @@ export const Waveform = ({
   ]);
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onBarClick) return;
+    if (!onBarClick) {
+      return;
+    }
 
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {
+      return;
+    }
 
     const x = e.clientX - rect.left;
     const barIndex = Math.floor(x / (barWidth + barGap));
@@ -193,7 +201,9 @@ export const ScrollingWaveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -233,10 +243,14 @@ export const ScrollingWaveform = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const animate = (currentTime: number) => {
       const deltaTime = lastTimeRef.current
@@ -293,7 +307,9 @@ export const ScrollingWaveform = ({
           x: nextX,
           height: newHeight,
         });
-        if (barsRef.current.length > barCount * 2) break;
+        if (barsRef.current.length > barCount * 2) {
+          break;
+        }
       }
 
       const centerY = rect.height / 2;
@@ -409,7 +425,9 @@ export const AudioScrubber = ({
 
   const handleScrub = (clientX: number) => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
@@ -427,7 +445,9 @@ export const AudioScrubber = ({
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
 
     const handleMouseMove = (e: MouseEvent) => {
       handleScrub(e.clientX);
@@ -444,7 +464,7 @@ export const AudioScrubber = ({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, handleScrub]);
 
   const heightStyle = typeof height === "number" ? `${height}px` : height;
 
@@ -484,7 +504,7 @@ export const AudioScrubber = ({
 
       {showHandle && (
         <div
-          className="-translate-x-1/2 -translate-y-1/2 pointer-events-none absolute top-1/2 h-4 w-4 rounded-full border-2 border-background bg-primary shadow-lg transition-transform hover:scale-110"
+          className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary shadow-lg transition-transform hover:scale-110"
           style={{ left: `${localProgress * 100}%` }}
         />
       )}
@@ -591,7 +611,7 @@ export const MicrophoneWaveform = ({
       }
       return;
     }
-  }, [processing, active]);
+  }, [processing, active, data.length, data.map]);
 
   useEffect(() => {
     if (!active) {
@@ -635,7 +655,9 @@ export const MicrophoneWaveform = ({
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         const updateData = () => {
-          if (!(analyserRef.current && active)) return;
+          if (!(analyserRef.current && active)) {
+            return;
+          }
 
           analyserRef.current.getByteFrequencyData(dataArray);
 
@@ -785,7 +807,9 @@ export const LiveMicrophoneWaveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -899,9 +923,10 @@ export const LiveMicrophoneWaveform = ({
     setDragOffset,
     enableAudioPlayback,
     historyRef,
+    processAudioBlob,
   ]);
 
-  const processAudioBlob = async (blob: Blob) => {
+  async function processAudioBlob(blob: Blob) {
     try {
       const arrayBuffer = await blob.arrayBuffer();
       if (audioContextRef.current) {
@@ -912,7 +937,7 @@ export const LiveMicrophoneWaveform = ({
     } catch (error) {
       console.error("Error processing audio:", error);
     }
-  };
+  }
 
   const playScrubSound = (position: number, direction: number) => {
     if (
@@ -921,8 +946,9 @@ export const LiveMicrophoneWaveform = ({
         audioBufferRef.current &&
         audioContextRef.current
       )
-    )
+    ) {
       return;
+    }
 
     if (scrubSourceRef.current) {
       try {
@@ -963,8 +989,9 @@ export const LiveMicrophoneWaveform = ({
         audioBufferRef.current &&
         audioContextRef.current
       )
-    )
+    ) {
       return;
+    }
 
     if (sourceNodeRef.current) {
       try {
@@ -994,7 +1021,9 @@ export const LiveMicrophoneWaveform = ({
   };
 
   useEffect(() => {
-    if (playbackPosition === null || !audioBufferRef.current) return;
+    if (playbackPosition === null || !audioBufferRef.current) {
+      return;
+    }
 
     let animationId: number;
     const updatePlaybackVisual = () => {
@@ -1040,13 +1069,14 @@ export const LiveMicrophoneWaveform = ({
     animationId = requestAnimationFrame(updatePlaybackVisual);
 
     return () => {
-      if (animationId) cancelAnimationFrame(animationId);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
     };
   }, [
     playbackPosition,
     playbackRate,
     barWidth,
-    baseBarHeight,
     barGap,
     setDragOffset,
     historyRef,
@@ -1054,12 +1084,21 @@ export const LiveMicrophoneWaveform = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (!active && historyRef.current.length === 0 && playbackPosition === null)
+    if (!canvas) {
       return;
+    }
+    if (
+      !active &&
+      historyRef.current.length === 0 &&
+      playbackPosition === null
+    ) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const animate = (currentTime: number) => {
       if (active && currentTime - lastUpdateRef.current > updateRate) {
@@ -1189,7 +1228,9 @@ export const LiveMicrophoneWaveform = ({
   ]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (active || historyRef.current.length === 0) return;
+    if (active || historyRef.current.length === 0) {
+      return;
+    }
 
     e.preventDefault();
     setIsDragging(true);
@@ -1198,7 +1239,9 @@ export const LiveMicrophoneWaveform = ({
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
 
     let lastScrubTime = 0;
     let lastMouseX = dragStartXRef.current;
@@ -1286,6 +1329,8 @@ export const LiveMicrophoneWaveform = ({
     dragOffset,
     enableAudioPlayback,
     historyRef,
+    playFromPosition,
+    playScrubSound,
   ]);
 
   return (
@@ -1374,7 +1419,9 @@ export const RecordingWaveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -1463,10 +1510,14 @@ export const RecordingWaveform = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const animate = (currentTime: number) => {
       if (recording && currentTime - lastUpdateRef.current > updateRate) {
@@ -1582,7 +1633,9 @@ export const RecordingWaveform = ({
 
   const handleScrub = (clientX: number) => {
     const container = containerRef.current;
-    if (!container || recording || !isRecordingComplete) return;
+    if (!container || recording || !isRecordingComplete) {
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
@@ -1592,7 +1645,9 @@ export const RecordingWaveform = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (recording || !isRecordingComplete) return;
+    if (recording || !isRecordingComplete) {
+      return;
+    }
 
     e.preventDefault();
     setIsDragging(true);
@@ -1600,7 +1655,9 @@ export const RecordingWaveform = ({
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
 
     const handleMouseMove = (e: MouseEvent) => {
       handleScrub(e.clientX);
@@ -1617,7 +1674,7 @@ export const RecordingWaveform = ({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, handleScrub]);
 
   return (
     <div

@@ -207,7 +207,7 @@ export const useModels = () => {
       extractionCompletedUnlisten.then((fn) => fn());
       extractionFailedUnlisten.then((fn) => fn());
     };
-  }, []);
+  }, [checkFirstRun, loadCurrentModel, loadModels]);
 
   return {
     models,

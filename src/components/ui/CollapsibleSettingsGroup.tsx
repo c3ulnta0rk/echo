@@ -4,13 +4,13 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Disclosure, DisclosureContent, DisclosureTrigger } from "./disclosure";
 
-type CollapsibleSettingsGroupProps = {
+interface CollapsibleSettingsGroupProps {
   title: string;
   description?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
-};
+}
 
 export const CollapsibleSettingsGroup: React.FC<
   CollapsibleSettingsGroupProps

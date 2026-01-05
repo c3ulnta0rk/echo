@@ -82,7 +82,7 @@ const noop = () => {
   // intentionally empty - used for downloadable models that can't be deleted
 };
 
-type ModelCardProps = {
+interface ModelCardProps {
   model: ModelInfo;
   isActive: boolean;
   isDownloading: boolean;
@@ -91,7 +91,7 @@ type ModelCardProps = {
   downloadSpeed?: number;
   onSelect: () => void;
   onDelete: () => void;
-};
+}
 
 const ModelCard: React.FC<ModelCardProps> = ({
   model,

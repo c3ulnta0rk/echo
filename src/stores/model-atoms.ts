@@ -13,26 +13,26 @@ export type ModelStatus =
   | "unloaded"
   | "none";
 
-type ModelStateEvent = {
+interface ModelStateEvent {
   event_type: string;
   model_id?: string;
   model_name?: string;
   error?: string;
-};
+}
 
-type DownloadProgress = {
+interface DownloadProgress {
   model_id: string;
   downloaded: number;
   total: number;
   percentage: number;
-};
+}
 
-type DownloadStats = {
+interface DownloadStats {
   startTime: number;
   lastUpdate: number;
   totalDownloaded: number;
   speed: number;
-};
+}
 
 // State Atoms
 export const modelsAtom = atom<ModelInfo[]>([]);

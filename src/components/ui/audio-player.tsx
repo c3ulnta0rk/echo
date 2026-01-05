@@ -78,7 +78,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -102,10 +104,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   // Render waveform
   const renderWaveform = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -212,7 +218,10 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [
+    // Also immediately re-render the waveform
+    renderWaveform,
+  ]);
 
   // Animation loop for playback
   useEffect(() => {
@@ -249,19 +258,25 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         animationRef.current = undefined;
       }
     };
-  }, [isPlaying, isDragging]);
+  }, [
+    isPlaying,
+    isDragging, // Still render when not playing to show current state
+    renderWaveform,
+  ]);
 
   // Re-render when currentTime changes (for scrubbing)
   useEffect(() => {
     if (!isPlaying) {
       renderWaveform();
     }
-  }, [isPlaying]);
+  }, [isPlaying, renderWaveform]);
 
   // Audio event handlers
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     const handleLoadedMetadata = () => {
       setDuration(audio.duration || 0);
@@ -291,12 +306,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
     };
-  }, []);
+  }, [renderWaveform]);
 
   // Calculate time from click position
   const getTimeFromPosition = (clientX: number) => {
     const container = containerRef.current;
-    if (!container) return 0;
+    if (!container) {
+      return 0;
+    }
 
     const rect = container.getBoundingClientRect();
     const step = barWidth + barGap;
@@ -322,7 +339,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
 
     const handlePointerMove = (e: MouseEvent) => {
       const newTime = getTimeFromPosition(e.clientX);
@@ -354,11 +373,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       );
       document.removeEventListener("touchend", handlePointerUp);
     };
-  }, [isDragging]);
+  }, [isDragging, getTimeFromPosition, renderWaveform]);
 
   const togglePlay = async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) {
+      return;
+    }
 
     try {
       if (isPlaying) {
@@ -372,7 +393,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   };
 
   const formatTime = (time: number): string => {
-    if (!isFinite(time)) return "0:00";
+    if (!Number.isFinite(time)) {
+      return "0:00";
+    }
 
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);

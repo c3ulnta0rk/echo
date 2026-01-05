@@ -45,7 +45,9 @@ export const Slider: React.FC<SliderProps> = ({
   const percentage = ((value - min) / (max - min)) * 100;
 
   const handleInteraction = (clientX: number) => {
-    if (disabled || !trackRef.current) return;
+    if (disabled || !trackRef.current) {
+      return;
+    }
     const rect = trackRef.current.getBoundingClientRect();
     const x = clientX - rect.left;
     const newPercentage = Math.max(0, Math.min(1, x / rect.width));
@@ -55,7 +57,9 @@ export const Slider: React.FC<SliderProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (disabled) return;
+    if (disabled) {
+      return;
+    }
     e.preventDefault();
     handleInteraction(e.clientX);
 
@@ -93,7 +97,7 @@ export const Slider: React.FC<SliderProps> = ({
         animate={{
           left: `calc(8px + ${percentage}% * (100% - 16px) / 100% - 2px)`,
         }}
-        className="-translate-y-1/2 pointer-events-none absolute top-1/2 h-5 w-1 rounded-full bg-foreground/50 transition-[height,background-color,transform] duration-200 ease-out group-hover:h-[22px] group-hover:scale-x-105 group-hover:bg-foreground/70 group-active:h-6 group-active:scale-x-110 group-active:bg-foreground/90"
+        className="pointer-events-none absolute top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-foreground/50 transition-[height,background-color,transform] duration-200 ease-out group-hover:h-[22px] group-hover:scale-x-105 group-hover:bg-foreground/70 group-active:h-6 group-active:scale-x-110 group-active:bg-foreground/90"
         transition={spring}
       />
 

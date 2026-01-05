@@ -2,7 +2,7 @@ import { Github } from "lucide-react";
 import EchoLogo from "@/components/icons/echo-logo";
 import { Button } from "@/components/ui/button";
 
-type FooterProps = {
+interface FooterProps {
   logo?: React.ReactNode;
   brandName: string;
   showBrandName?: boolean;
@@ -23,7 +23,7 @@ type FooterProps = {
     text: string;
     license?: string;
   };
-};
+}
 
 export function Footer({
   logo,
@@ -67,7 +67,7 @@ export function Footer({
         </div>
         <div className="mt-6 border-t pt-6 md:mt-4 md:pt-8 lg:grid lg:grid-cols-10">
           <nav className="lg:col-[4/11] lg:mt-0">
-            <ul className="-my-1 -mx-2 flex list-none flex-wrap lg:justify-end">
+            <ul className="-mx-2 -my-1 flex list-none flex-wrap lg:justify-end">
               {mainLinks.map((link, i) => (
                 <li className="mx-2 my-1 shrink-0" key={i}>
                   <a
@@ -81,7 +81,7 @@ export function Footer({
             </ul>
           </nav>
           <div className="mt-6 lg:col-[4/11] lg:mt-0">
-            <ul className="-my-1 -mx-3 flex list-none flex-wrap lg:justify-end">
+            <ul className="-mx-3 -my-1 flex list-none flex-wrap lg:justify-end">
               {legalLinks.map((link, i) => (
                 <li className="mx-3 my-1 shrink-0" key={i}>
                   <a

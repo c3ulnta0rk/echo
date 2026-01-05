@@ -105,7 +105,7 @@ function ModelCard({
       transition={{ duration: 0.5, delay: index * 0.1 }}
     >
       {model.recommended && (
-        <div className="-top-2 -right-2 absolute rounded-full bg-primary px-2 py-0.5 font-semibold text-[10px] text-primary-foreground">
+        <div className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 font-semibold text-[10px] text-primary-foreground">
           Recommended
         </div>
       )}

@@ -73,7 +73,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
           case "loading_completed":
             setModelStatus("ready");
             setModelError(null);
-            if (model_id) setCurrentModelId(model_id);
+            if (model_id) {
+              setCurrentModelId(model_id);
+            }
             break;
           case "loading_failed":
             setModelStatus("error");
@@ -218,18 +220,18 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
       extractionCompletedUnlisten.then((fn) => fn());
       extractionFailedUnlisten.then((fn) => fn());
     };
-  }, []);
+  }, [handleModelSelect, loadCurrentModel, loadModels]);
 
-  const loadModels = async () => {
+  async function loadModels() {
     try {
       const modelList = await invoke<ModelInfo[]>("get_available_models");
       setModels(modelList);
     } catch (err) {
       console.error("Failed to load models:", err);
     }
-  };
+  }
 
-  const loadCurrentModel = async () => {
+  async function loadCurrentModel() {
     try {
       const current = await invoke<string>("get_current_model");
       setCurrentModelId(current);
@@ -252,9 +254,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
       setModelStatus("error");
       setModelError("Failed to check model status");
     }
-  };
+  }
 
-  const handleModelSelect = async (modelId: string) => {
+  async function handleModelSelect(modelId: string) {
     try {
       setModelError(null);
       await invoke("set_active_model", { modelId });
@@ -265,7 +267,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
       setModelStatus("error");
       onError?.(errorMsg);
     }
-  };
+  }
 
   const handleModelDownload = async (modelId: string) => {
     try {

@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { ModelOption } from "./types";
 
-type ModelSelectProps = {
+interface ModelSelectProps {
   value: string;
   options: ModelOption[];
   disabled?: boolean;
@@ -29,7 +29,7 @@ type ModelSelectProps = {
   onCreate?: (value: string) => void;
   onBlur: () => void;
   className?: string;
-};
+}
 
 export const ModelSelect: React.FC<ModelSelectProps> = ({
   value,

@@ -124,14 +124,14 @@ const MENTION_PLUGINS = [
   MentionInputPlugin.withComponent(MentionInputElement),
 ];
 
-type UseMarkdownEditorOptions = {
+interface UseMarkdownEditorOptions {
   content?: string;
   onUpdate?: (markdown: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
   editable?: boolean;
   enableMentions?: boolean;
-};
+}
 
 export function useMarkdownEditor({
   content = "",

@@ -107,7 +107,7 @@ export const customSoundsAtom = atom<{ start: boolean; stop: boolean }>({
 export const postProcessModelOptionsAtom = atom<Record<string, string[]>>({});
 
 // Action Atoms
-export const refreshSettingsAtom = atom(null, async (get, set) => {
+export const refreshSettingsAtom = atom(null, async (_get, set) => {
   try {
     const { load } = await import("@tauri-apps/plugin-store");
     const store = await load("settings_store.json", {
@@ -200,7 +200,7 @@ export const checkCustomSoundsAtom = atom(null, async (_get, set) => {
   }
 });
 
-export const initializeAtom = atom(null, async (get, set) => {
+export const initializeAtom = atom(null, async (_get, set) => {
   await Promise.all([
     set(refreshSettingsAtom),
     set(refreshAudioDevicesAtom),
@@ -249,7 +249,7 @@ export const updateSettingAtom = atom(
 
 export const resetSettingAtom = atom(
   null,
-  async (get, set, key: keyof Settings) => {
+  async (_get, set, key: keyof Settings) => {
     const defaultValue = DEFAULT_SETTINGS[key];
     if (defaultValue !== undefined) {
       await set(updateSettingAtom, key, defaultValue);
@@ -310,7 +310,7 @@ export const updateBindingAtom = atom(
   }
 );
 
-export const resetBindingAtom = atom(null, async (get, set, id: string) => {
+export const resetBindingAtom = atom(null, async (_get, set, id: string) => {
   const updateKey = `binding_${id}`;
   set(isUpdatingAtom, (prev: any) => ({ ...prev, [updateKey]: true }));
 
@@ -360,7 +360,7 @@ export const setPostProcessProviderAtom = atom(
 export const updatePostProcessSettingAtom = atom(
   null,
   async (
-    get,
+    _get,
     set,
     settingType: "base_url" | "api_key" | "model",
     providerId: string,
@@ -401,7 +401,7 @@ export const updatePostProcessSettingAtom = atom(
 
 export const updatePostProcessApiKeyAtom = atom(
   null,
-  async (get, set, providerId: string, apiKey: string) => {
+  async (_get, set, providerId: string, apiKey: string) => {
     set(postProcessModelOptionsAtom, (prev) => ({
       ...prev,
       [providerId]: [],
@@ -412,7 +412,7 @@ export const updatePostProcessApiKeyAtom = atom(
 
 export const fetchPostProcessModelsAtom = atom(
   null,
-  async (get, set, providerId: string) => {
+  async (_get, set, providerId: string) => {
     const updateKey = `post_process_models_fetch:${providerId}`;
     set(isUpdatingAtom, (prev: any) => ({ ...prev, [updateKey]: true }));
 

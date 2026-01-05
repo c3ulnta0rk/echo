@@ -7,12 +7,12 @@ import { useHasTouchPrimary } from "@/hooks/use-has-touch-primary";
 import { cn } from "@/lib/utils";
 
 const ScrollAreaContext = createContext<boolean>(false);
-type MaskState = {
+interface MaskState {
   top: boolean;
   bottom: boolean;
   left: boolean;
   right: boolean;
-};
+}
 
 const ScrollArea = ({
   className,

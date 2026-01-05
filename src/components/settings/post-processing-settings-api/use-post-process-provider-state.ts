@@ -3,12 +3,12 @@ import type { PostProcessProvider } from "../../../lib/types";
 import { getDefaultBaseUrl } from "./default-providers";
 import type { ModelOption } from "./types";
 
-type DropdownOption = {
+interface DropdownOption {
   value: string;
   label: string;
-};
+}
 
-type PostProcessProviderState = {
+interface PostProcessProviderState {
   enabled: boolean;
   providerOptions: DropdownOption[];
   selectedProviderId: string;
@@ -34,7 +34,7 @@ type PostProcessProviderState = {
   handleModelSelect: (value: string) => void;
   handleModelCreate: (value: string) => void;
   handleRefreshModels: () => void;
-};
+}
 
 export const usePostProcessProviderState = (): PostProcessProviderState => {
   const {
@@ -81,7 +81,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   };
 
   const handleBaseUrlChange = (value: string) => {
-    if (!(selectedProvider && selectedProvider.allow_base_url_edit)) {
+    if (!selectedProvider?.allow_base_url_edit) {
       return;
     }
     const trimmed = value.trim();
@@ -91,13 +91,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   };
 
   const handleBaseUrlReset = () => {
-    if (
-      !(
-        selectedProvider &&
-        selectedProvider.allow_base_url_edit &&
-        defaultBaseUrl
-      )
-    ) {
+    if (!(selectedProvider?.allow_base_url_edit && defaultBaseUrl)) {
       return;
     }
     if (baseUrl !== defaultBaseUrl) {
@@ -139,7 +133,9 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
     const upsert = (value: string | null | undefined) => {
       const trimmed = value?.trim();
-      if (!trimmed || seen.has(trimmed)) return;
+      if (!trimmed || seen.has(trimmed)) {
+        return;
+      }
       seen.add(trimmed);
       options.push({ value: trimmed, label: trimmed });
     };

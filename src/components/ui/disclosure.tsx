@@ -11,22 +11,22 @@ import * as React from "react";
 import { createContext, useContext, useEffect, useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type DisclosureContextType = {
+export interface DisclosureContextType {
   open: boolean;
   toggle: () => void;
   variants?: { expanded: Variant; collapsed: Variant };
-};
+}
 
 const DisclosureContext = createContext<DisclosureContextType | undefined>(
   undefined
 );
 
-export type DisclosureProviderProps = {
+export interface DisclosureProviderProps {
   children: React.ReactNode;
   open: boolean;
   onOpenChange?: (open: boolean) => void;
   variants?: { expanded: Variant; collapsed: Variant };
-};
+}
 
 function DisclosureProvider({
   children,
@@ -69,14 +69,14 @@ function useDisclosure() {
   return context;
 }
 
-export type DisclosureProps = {
+export interface DisclosureProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
   className?: string;
   variants?: { expanded: Variant; collapsed: Variant };
   transition?: Transition;
-};
+}
 
 export function Disclosure({
   open: openProp = false,

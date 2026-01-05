@@ -8,10 +8,10 @@ import {
 import { SettingContainer } from "@/components/ui/SettingContainer";
 import { useSettings } from "@/hooks/use-settings";
 
-type InputTrackingIdleTimeoutProps = {
+interface InputTrackingIdleTimeoutProps {
   descriptionMode?: "tooltip" | "inline";
   grouped?: boolean;
-};
+}
 
 const timeoutOptions = [
   { value: "0", label: "Disabled (app switch/click only)" },

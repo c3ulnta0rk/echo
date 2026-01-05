@@ -79,7 +79,9 @@ export const LiveWaveform = ({
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!(canvas && container)) return;
+    if (!(canvas && container)) {
+      return;
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       const rect = container.getBoundingClientRect();
@@ -255,7 +257,9 @@ export const LiveWaveform = ({
       return;
     }
 
-    if (disableInternalAudio) return;
+    if (disableInternalAudio) {
+      return;
+    }
 
     const setupMicrophone = async () => {
       try {
@@ -326,15 +330,20 @@ export const LiveWaveform = ({
     onError,
     onStreamReady,
     onStreamEnd,
+    disableInternalAudio,
   ]);
 
   // Animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
 
     let rafId: number;
 
@@ -557,13 +566,9 @@ export const LiveWaveform = ({
       {...props}
     >
       {!(active || processing) && (
-        <div className="-translate-y-1/2 absolute top-1/2 right-0 left-0 border-muted-foreground/20 border-t-2 border-dotted" />
+        <div className="absolute top-1/2 right-0 left-0 -translate-y-1/2 border-muted-foreground/20 border-t-2 border-dotted" />
       )}
-      <canvas
-        aria-hidden="true"
-        className="block h-full w-full"
-        ref={canvasRef}
-      />
+      <canvas className="block h-full w-full" ref={canvasRef} />
     </div>
   );
 };

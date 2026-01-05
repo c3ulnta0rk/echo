@@ -37,7 +37,9 @@ export const LogDirectory: React.FC<LogDirectoryProps> = ({
   }, []);
 
   const handleOpen = async () => {
-    if (!logDir) return;
+    if (!logDir) {
+      return;
+    }
     try {
       await invoke("open_log_dir");
     } catch (openError) {

@@ -6,7 +6,7 @@ import { EditorToolbar } from "./toolbar";
 import { useMarkdownEditor } from "./use-markdown-editor";
 import "./editor.css";
 
-type MarkdownEditorProps = {
+interface MarkdownEditorProps {
   value?: string;
   onChange?: (markdown: string) => void;
   placeholder?: string;
@@ -17,7 +17,7 @@ type MarkdownEditorProps = {
   showToolbar?: boolean;
   /** Enable @mention functionality with custom items like @output */
   showMentionMenu?: boolean;
-};
+}
 
 export function MarkdownEditor({
   value = "",

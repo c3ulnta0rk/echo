@@ -49,7 +49,7 @@ export const HistorySettings = () => {
         }
       });
     };
-  }, []);
+  }, [loadHistoryEntries]);
 
   const toggleSaved = async (id: number) => {
     try {

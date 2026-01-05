@@ -26,7 +26,9 @@ const unsupportedModels = ["parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b-v3"];
 
 // Helper to get flag component for a country code
 const getFlagComponent = (countryCode?: string) => {
-  if (!countryCode) return null;
+  if (!countryCode) {
+    return null;
+  }
   const FlagComponent = (Flags as any)[countryCode];
   return FlagComponent || null;
 };

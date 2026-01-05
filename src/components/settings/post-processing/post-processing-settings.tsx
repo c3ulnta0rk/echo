@@ -76,7 +76,7 @@ const PostProcessingSettingsApiComponent = () => {
     if (state.enabled && state.selectedProviderId) {
       state.handleRefreshModels();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.enabled, state.handleRefreshModels, state.selectedProviderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if local value differs from default
   const isLocalBaseUrlModified =
@@ -252,7 +252,9 @@ const PostProcessingSettingsPromptsComponent = () => {
     prompts.find((prompt) => prompt.id === selectedPromptId) || null;
 
   useEffect(() => {
-    if (isCreating) return;
+    if (isCreating) {
+      return;
+    }
 
     if (selectedPrompt) {
       setDraftName(selectedPrompt.name);
@@ -263,9 +265,9 @@ const PostProcessingSettingsPromptsComponent = () => {
     }
   }, [
     isCreating,
-    selectedPromptId,
     selectedPrompt?.name,
     selectedPrompt?.prompt,
+    selectedPrompt,
   ]);
 
   // Focus input when entering edit mode
@@ -277,14 +279,18 @@ const PostProcessingSettingsPromptsComponent = () => {
   }, [isEditingName]);
 
   const handlePromptSelect = (promptId: string | null) => {
-    if (!promptId) return;
+    if (!promptId) {
+      return;
+    }
     updateSetting("post_process_selected_prompt_id", promptId);
     setIsCreating(false);
     setIsEditingName(false);
   };
 
   const handleCreatePrompt = async () => {
-    if (!(draftName.trim() && draftText.trim())) return;
+    if (!(draftName.trim() && draftText.trim())) {
+      return;
+    }
 
     try {
       const newPrompt = await invoke<LLMPrompt>("add_post_process_prompt", {
@@ -300,7 +306,9 @@ const PostProcessingSettingsPromptsComponent = () => {
   };
 
   const handleSaveNameEdit = async () => {
-    if (!(selectedPromptId && draftName.trim())) return;
+    if (!(selectedPromptId && draftName.trim())) {
+      return;
+    }
 
     try {
       await invoke("update_post_process_prompt", {
@@ -323,7 +331,9 @@ const PostProcessingSettingsPromptsComponent = () => {
   };
 
   const handleUpdatePrompt = async () => {
-    if (!(selectedPromptId && draftName.trim() && draftText.trim())) return;
+    if (!(selectedPromptId && draftName.trim() && draftText.trim())) {
+      return;
+    }
 
     try {
       await invoke("update_post_process_prompt", {
@@ -338,7 +348,9 @@ const PostProcessingSettingsPromptsComponent = () => {
   };
 
   const handleDeletePrompt = async (promptId: string) => {
-    if (!promptId) return;
+    if (!promptId) {
+      return;
+    }
 
     try {
       await invoke("delete_post_process_prompt", { id: promptId });

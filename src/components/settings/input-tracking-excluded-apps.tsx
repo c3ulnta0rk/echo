@@ -21,10 +21,10 @@ import { useSettings } from "@/hooks/use-settings";
 
 type InstalledApp = [string, string]; // [name, bundle_id]
 
-type InputTrackingExcludedAppsProps = {
+interface InputTrackingExcludedAppsProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
-};
+}
 
 export const InputTrackingExcludedApps = ({
   descriptionMode = "tooltip",

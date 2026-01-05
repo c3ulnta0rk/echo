@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export type InputEntry = {
+export interface InputEntry {
   id: number;
   app_name: string;
   app_bundle_id: string | null;
@@ -19,12 +19,12 @@ export type InputEntry = {
   content: string;
   timestamp: number;
   duration_ms: number;
-};
+}
 
-type KeyboardInputEntryProps = {
+interface KeyboardInputEntryProps {
   entry: InputEntry;
   onDelete: (id: number) => Promise<void>;
-};
+}
 
 export const KeyboardInputEntry: React.FC<KeyboardInputEntryProps> = ({
   entry,

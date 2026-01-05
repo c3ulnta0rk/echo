@@ -43,7 +43,7 @@ export const KeyboardInputList = () => {
         }
       });
     };
-  }, []);
+  }, [loadEntries]);
 
   const handleDelete = async (id: number) => {
     try {

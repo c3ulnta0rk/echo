@@ -31,7 +31,9 @@ export const LogLevelSelector: React.FC<LogLevelSelectorProps> = ({
 
   const handleSelect = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const parsed = Number.parseInt(event.target.value, 10);
-    if (Number.isNaN(parsed) || parsed === currentLevel) return;
+    if (Number.isNaN(parsed) || parsed === currentLevel) {
+      return;
+    }
     try {
       await updateSetting("log_level", parsed as unknown as number);
     } catch (error) {

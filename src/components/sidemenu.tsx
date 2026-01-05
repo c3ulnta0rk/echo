@@ -39,15 +39,15 @@ import UpdateChecker from "./update-checker";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
 
-type IconProps = {
+interface IconProps {
   className?: string;
-};
+}
 
-type SectionConfig = {
+interface SectionConfig {
   label: string;
   icon: React.ComponentType<IconProps>;
   component: React.ComponentType;
-};
+}
 
 export const SECTIONS_CONFIG = {
   app: {
@@ -132,7 +132,7 @@ function AppSidebar({
   onSectionChange: (section: SidebarSection) => void;
 } & React.ComponentProps<typeof Sidebar>) {
   const availableSections = Object.entries(SECTIONS_CONFIG).map(
-    ([id, config]) => ({ id: id as SidebarSection, ...config }),
+    ([id, config]) => ({ id: id as SidebarSection, ...config })
   );
 
   return (
@@ -210,10 +210,10 @@ export function SidebarLayout({
           // When collapsed, no margin
           "md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-0",
           // Smooth transition
-          "transition-[margin] duration-200 ease-linear",
+          "transition-[margin] duration-200 ease-linear"
         )}
       >
-        <div className="flex h-full overflow-auto pt-12 w-full *:w-full">
+        <div className="flex h-full w-full overflow-auto pt-12 *:w-full">
           {children}
         </div>
       </SidebarInset>

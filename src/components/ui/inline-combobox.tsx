@@ -42,7 +42,7 @@ type FilterFn = (
   search: string
 ) => boolean;
 
-type InlineComboboxContextValue = {
+interface InlineComboboxContextValue {
   filter: FilterFn | false;
   inputProps: UseComboboxInputResult["props"];
   inputRef: RefObject<HTMLInputElement | null>;
@@ -50,7 +50,7 @@ type InlineComboboxContextValue = {
   showTrigger: boolean;
   trigger: string;
   setHasEmpty: (hasEmpty: boolean) => void;
-};
+}
 
 const InlineComboboxContext = createContext<InlineComboboxContextValue>(
   null as unknown as InlineComboboxContextValue
@@ -69,7 +69,7 @@ const defaultFilter: FilterFn = (
   );
 };
 
-type InlineComboboxProps = {
+interface InlineComboboxProps {
   children: ReactNode;
   element: TElement;
   trigger: string;
@@ -78,7 +78,7 @@ type InlineComboboxProps = {
   showTrigger?: boolean;
   value?: string;
   setValue?: (value: string) => void;
-};
+}
 
 const InlineCombobox = ({
   children,
@@ -115,11 +115,15 @@ const InlineCombobox = ({
   useEffect(() => {
     const path = editor.api.findPath(element);
 
-    if (!path) return;
+    if (!path) {
+      return;
+    }
 
     const point = editor.api.before(path);
 
-    if (!point) return;
+    if (!point) {
+      return;
+    }
 
     const pointRef = editor.api.pointRef(point);
     insertPoint.current = pointRef.current;
@@ -175,7 +179,7 @@ const InlineCombobox = ({
     if (!store.getState().activeId) {
       store.setActiveId(store.first());
     }
-  }, [items, store]);
+  }, [store]);
 
   return (
     <span contentEditable={false}>

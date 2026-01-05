@@ -69,14 +69,20 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
 
   useEffect(() => {
     // Only add event listeners when we're in editing mode
-    if (editingShortcutId === null) return;
+    if (editingShortcutId === null) {
+      return;
+    }
 
     let cleanup = false;
 
     // Keyboard event listeners
     const handleKeyDown = async (e: KeyboardEvent) => {
-      if (cleanup) return;
-      if (e.repeat) return; // ignore auto-repeat
+      if (cleanup) {
+        return;
+      }
+      if (e.repeat) {
+        return; // ignore auto-repeat
+      }
       if (e.key === "Escape") {
         // Cancel recording and restore original binding
         if (editingShortcutId && originalBinding) {
@@ -116,7 +122,9 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
     };
 
     const handleKeyUp = async (e: KeyboardEvent) => {
-      if (cleanup) return;
+      if (cleanup) {
+        return;
+      }
       e.preventDefault();
 
       // Get the key with OS-specific naming and normalize it
@@ -168,7 +176,9 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
 
     // Add click outside handler
     const handleClickOutside = async (e: MouseEvent) => {
-      if (cleanup) return;
+      if (cleanup) {
+        return;
+      }
       const activeElement = shortcutRefs.current.get(editingShortcutId);
       if (activeElement && !activeElement.contains(e.target as Node)) {
         // Cancel shortcut recording and restore original binding
@@ -216,7 +226,9 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
 
   // Start recording a new shortcut
   const startRecording = async (id: string) => {
-    if (editingShortcutId === id) return; // Already editing this shortcut
+    if (editingShortcutId === id) {
+      return; // Already editing this shortcut
+    }
 
     // Suspend current binding to avoid firing while recording
     await invoke("suspend_binding", { id }).catch(console.error);
@@ -230,7 +242,9 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
 
   // Format the current shortcut keys being recorded
   const formatCurrentKeys = (): string => {
-    if (recordedKeys.length === 0) return "Press keys...";
+    if (recordedKeys.length === 0) {
+      return "Press keys...";
+    }
 
     // Use the same formatting as the display to ensure consistency
     return formatKeyCombination(recordedKeys.join("+"), osType);

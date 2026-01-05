@@ -30,7 +30,9 @@ export const TextDisplay: React.FC<TextDisplayProps> = ({
   const [showCopied, setShowCopied] = useState(false);
 
   const handleCopy = async () => {
-    if (!(value && copyable)) return;
+    if (!(value && copyable)) {
+      return;
+    }
 
     try {
       await navigator.clipboard.writeText(value);

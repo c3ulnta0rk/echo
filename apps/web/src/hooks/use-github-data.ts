@@ -41,7 +41,9 @@ export function useGithubData() {
       .then((res) => res.json())
       .then((releaseData) => {
         const assets = releaseData.assets as any[];
-        if (!assets) return;
+        if (!assets) {
+          return;
+        }
 
         const links = {
           macSilicon:

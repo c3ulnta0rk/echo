@@ -77,7 +77,9 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   };
 
   const handleRetranscribe = async () => {
-    if (isRetranscribing) return;
+    if (isRetranscribing) {
+      return;
+    }
 
     setIsRetranscribing(true);
     try {
@@ -91,7 +93,9 @@ export const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   };
 
   const handleReprocess = async () => {
-    if (isReprocessing) return;
+    if (isReprocessing) {
+      return;
+    }
 
     setIsReprocessing(true);
     try {
