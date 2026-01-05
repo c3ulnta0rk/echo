@@ -1,3 +1,6 @@
+[phases.install]
+cmd = "bun install"
+
 [phases.build]
 cmd = "bun run build"
 
