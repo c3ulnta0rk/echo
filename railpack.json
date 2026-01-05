@@ -1,0 +1,6 @@
+{
+  "$schema": "https://railpack.com/schema.json",
+  "build": {
+    "command": "bun run build:web"
+  }
+}
