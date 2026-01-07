@@ -132,7 +132,7 @@ function AppSidebar({
   onSectionChange: (section: SidebarSection) => void;
 } & React.ComponentProps<typeof Sidebar>) {
   const availableSections = Object.entries(SECTIONS_CONFIG).map(
-    ([id, config]) => ({ id: id as SidebarSection, ...config }),
+    ([id, config]) => ({ id: id as SidebarSection, ...config })
   );
 
   return (
@@ -146,7 +146,7 @@ function AppSidebar({
               size="lg"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
-                <EchoLogo data-tauri-drag-region className="size-4" />
+                <EchoLogo className="size-4" data-tauri-drag-region />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Echo</span>
@@ -203,7 +203,6 @@ export function SidebarLayout({
         onSectionChange={onSectionChange}
       />
       <SidebarInset
-        data-tauri-drag-region
         className={cn(
           "flex flex-col overflow-hidden",
           // Override the default ml-0 for inset variant when sidebar is expanded
@@ -211,8 +210,9 @@ export function SidebarLayout({
           // When collapsed, no margin
           "md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-0",
           // Smooth transition
-          "transition-[margin] duration-200 ease-linear",
+          "transition-[margin] duration-200 ease-linear"
         )}
+        data-tauri-drag-region
       >
         <div
           className="flex h-full w-full overflow-auto pt-12 *:w-full"
