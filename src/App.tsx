@@ -98,26 +98,32 @@ function App() {
 
   // Handle drag events for file drop overlay
   useEffect(() => {
-    const unlistenPromises = [
-      listen("drag-enter", () => setIsDragging(true)),
-      listen("drag-over", () => setIsDragging(true)),
-      listen("drag-leave", () => setIsDragging(false)),
-      listen("file-transcription-progress", () => setIsDragging(false)),
-    ];
+    const unlistenFns: (() => void)[] = [];
 
-    Promise.all(unlistenPromises).then((unlisteners) => {
-      return () => {
-        unlisteners.forEach((u) => {
-          u.then((fn) => fn());
-        });
-      };
-    });
+    const setupListeners = async () => {
+      unlistenFns.push(await listen("drag-enter", () => setIsDragging(true)));
+      unlistenFns.push(await listen("drag-over", () => setIsDragging(true)));
+      unlistenFns.push(await listen("drag-leave", () => setIsDragging(false)));
+      unlistenFns.push(
+        await listen("file-transcription-progress", () => setIsDragging(false))
+      );
+    };
+
+    setupListeners();
+
+    return () => {
+      for (const unlisten of unlistenFns) {
+        unlisten();
+      }
+    };
   }, []);
 
   // Handle transcription progress
   useEffect(() => {
-    const unlistenPromises = [
-      listen(
+    let unlisten: (() => void) | undefined;
+
+    const setupListener = async () => {
+      unlisten = await listen(
         "file-transcription-progress",
         (event: { payload: { status: string; progress: number } }) => {
           const { status, progress } = event.payload;
@@ -129,16 +135,14 @@ function App() {
             setTranscriptionProgress(progress);
           }
         }
-      ),
-    ];
+      );
+    };
 
-    Promise.all(unlistenPromises).then((unlisteners) => {
-      return () => {
-        unlisteners.forEach((u) => {
-          u.then((fn) => fn());
-        });
-      };
-    });
+    setupListener();
+
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   if (isInitializing) {
@@ -170,9 +174,7 @@ function App() {
       <Toaster />
       <SidebarLayout
         activeSection={currentSection}
-        isTranscribing={isTranscribing}
         onSectionChange={setCurrentSection}
-        transcriptionProgress={transcriptionProgress}
       >
         <div className="mx-auto max-w-xl">
           <AccessibilityPermissions />

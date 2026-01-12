@@ -22,7 +22,7 @@
     "strictNullChecks": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [
     {
       "path": "./tsconfig.node.json"

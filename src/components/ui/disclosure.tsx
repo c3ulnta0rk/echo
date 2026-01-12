@@ -2,19 +2,19 @@
 import {
   AnimatePresence,
   MotionConfig,
+  type MotionProps,
   motion,
-  type Transition,
-  type Variant,
-  type Variants,
 } from "motion/react";
 import * as React from "react";
 import { createContext, useContext, useEffect, useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
+type VariantDefinition = Record<string, string | number>;
+
 export interface DisclosureContextType {
   open: boolean;
   toggle: () => void;
-  variants?: { expanded: Variant; collapsed: Variant };
+  variants?: { expanded: VariantDefinition; collapsed: VariantDefinition };
 }
 
 const DisclosureContext = createContext<DisclosureContextType | undefined>(
@@ -25,7 +25,7 @@ export interface DisclosureProviderProps {
   children: React.ReactNode;
   open: boolean;
   onOpenChange?: (open: boolean) => void;
-  variants?: { expanded: Variant; collapsed: Variant };
+  variants?: { expanded: VariantDefinition; collapsed: VariantDefinition };
 }
 
 function DisclosureProvider({
@@ -74,8 +74,8 @@ export interface DisclosureProps {
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
   className?: string;
-  variants?: { expanded: Variant; collapsed: Variant };
-  transition?: Transition;
+  variants?: { expanded: VariantDefinition; collapsed: VariantDefinition };
+  transition?: MotionProps["transition"];
 }
 
 export function Disclosure({
@@ -147,7 +147,7 @@ export function DisclosureContent({
   const { open, variants } = useDisclosure();
   const uniqueId = useId();
 
-  const BASE_VARIANTS: Variants = {
+  const BASE_VARIANTS = {
     expanded: {
       height: "auto",
       opacity: 1,

@@ -1,5 +1,5 @@
 "use client";
-import { AnimatePresence, motion, type Transition } from "motion/react";
+import { AnimatePresence, type MotionProps, motion } from "motion/react";
 import {
   Children,
   cloneElement,
@@ -17,7 +17,7 @@ export interface AnimatedBackgroundProps {
   defaultValue?: string;
   onValueChange?: (newActiveId: string | null) => void;
   className?: string;
-  transition?: Transition;
+  transition?: MotionProps["transition"];
   enableHover?: boolean;
 }
 
