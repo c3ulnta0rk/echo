@@ -12,12 +12,13 @@ use symphonia::core::{
 };
 use std::fs::File;
 
-/// Supported audio formats
+/// Supported audio formats (including video files with audio tracks)
 pub enum AudioFormat {
     Wav,
     Mp3,
     M4a,
     Ogg,
+    Video,
     Unsupported,
 }
 
@@ -35,6 +36,7 @@ impl AudioFormat {
             "mp3" => AudioFormat::Mp3,
             "m4a" | "aac" => AudioFormat::M4a,
             "ogg" | "oga" => AudioFormat::Ogg,
+            "mp4" | "mov" | "avi" | "mkv" | "webm" | "flv" => AudioFormat::Video,
             _ => AudioFormat::Unsupported,
         }
     }
@@ -49,12 +51,11 @@ pub fn decode_audio_file<P: AsRef<Path>>(file_path: P) -> Result<Vec<f32>> {
 
     match format {
         AudioFormat::Wav => decode_wav_file(&file_path),
-        AudioFormat::Mp3 | AudioFormat::M4a | AudioFormat::Ogg => {
+        AudioFormat::Mp3 | AudioFormat::M4a | AudioFormat::Ogg | AudioFormat::Video => {
             decode_with_symphonia(&file_path)
         }
         AudioFormat::Unsupported => Err(anyhow::anyhow!(
-            "Unsupported audio format: {:?}",
-            file_path.as_ref().extension()
+            "Unsupported file format. Please provide an audio file (wav, mp3, m4a, ogg) or a video file with an audio track (mp4, mov, mkv, webm)."
         )),
     }
 }

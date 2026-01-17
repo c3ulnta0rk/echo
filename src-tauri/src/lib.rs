@@ -231,12 +231,17 @@ async fn validate_and_transcribe_file(
 ) -> Result<(), String> {
     // Validate file exists
     if !file_path.exists() {
-        let _ = app.emit("show-error-dialog", "File not found");
+        let error_payload = serde_json::json!({
+            "title": "File Not Found",
+            "message": "The selected file could not be found.",
+            "details": format!("Path: {}", file_path.display())
+        });
+        let _ = app.emit("show-error-dialog", error_payload);
         return Err("File not found".to_string());
     }
 
     // Validate file extension
-    let valid_extensions = ["wav", "wave", "mp3", "m4a", "aac", "ogg", "oga"];
+    let valid_extensions = ["wav", "wave", "mp3", "m4a", "aac", "ogg", "oga", "mp4", "mov", "avi", "mkv", "webm", "flv"];
     let extension = file_path
         .extension()
         .and_then(|e| e.to_str())
@@ -244,9 +249,13 @@ async fn validate_and_transcribe_file(
         .unwrap_or_default();
 
     if !valid_extensions.contains(&extension.as_str()) {
-        let error_msg = format!("Unsupported file format: .{}", extension);
-        let _ = app.emit("show-error-dialog", error_msg.clone());
-        return Err(error_msg);
+        let error_payload = serde_json::json!({
+            "title": "Unsupported File Format",
+            "message": format!("The file format '.{}' is not supported.", extension),
+            "details": "Supported formats: Audio (wav, mp3, m4a, ogg) and Video (mp4, mov, mkv, webm)"
+        });
+        let _ = app.emit("show-error-dialog", error_payload);
+        return Err(format!("Unsupported file format: .{}", extension));
     }
 
     // Get managers from state
@@ -276,13 +285,18 @@ async fn validate_and_transcribe_file_icon_drop(
     // Validate file exists
     if !file_path.exists() {
         // Show error dialog and open window
-        let _ = app.emit("show-error-dialog", "File not found");
+        let error_payload = serde_json::json!({
+            "title": "File Not Found",
+            "message": "The selected file could not be found.",
+            "details": format!("Path: {}", file_path.display())
+        });
+        let _ = app.emit("show-error-dialog", error_payload);
         startup::show_main_window(&app);
         return Err("File not found".to_string());
     }
 
     // Validate file extension
-    let valid_extensions = ["wav", "wave", "mp3", "m4a", "aac", "ogg", "oga"];
+    let valid_extensions = ["wav", "wave", "mp3", "m4a", "aac", "ogg", "oga", "mp4", "mov", "avi", "mkv", "webm", "flv"];
     let extension = file_path
         .extension()
         .and_then(|e| e.to_str())
@@ -291,10 +305,14 @@ async fn validate_and_transcribe_file_icon_drop(
 
     if !valid_extensions.contains(&extension.as_str()) {
         // Show unsupported file error
-        let error_msg = format!("Unsupported file format: .{}", extension);
-        let _ = app.emit("show-error-dialog", error_msg.clone());
+        let error_payload = serde_json::json!({
+            "title": "Unsupported File Format",
+            "message": format!("The file format '.{}' is not supported.", extension),
+            "details": "Supported formats: Audio (wav, mp3, m4a, ogg) and Video (mp4, mov, mkv, webm)"
+        });
+        let _ = app.emit("show-error-dialog", error_payload);
         startup::show_main_window(&app);
-        return Err(error_msg);
+        return Err(format!("Unsupported file format: .{}", extension));
     }
 
     // Get managers from state

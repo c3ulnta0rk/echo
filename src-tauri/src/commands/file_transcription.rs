@@ -14,6 +14,8 @@ pub struct FileTranscriptionProgress {
     pub status: String,
     pub progress: f64,
     pub message: String,
+    #[serde(rename = "fileName")]
+    pub file_name: Option<String>,
 }
 
 #[tauri::command]
@@ -30,13 +32,19 @@ pub async fn transcribe_audio_file(
         return Err(format!("File not found: {}", file_path));
     }
 
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(ToString::to_string);
+
     // Emit progress: Starting
     emit_progress(
         &app,
         &FileTranscriptionProgress {
             status: "decoding".to_string(),
             progress: 0.0,
-            message: "Loading audio file...".to_string(),
+            message: "Loading file...".to_string(),
+            file_name: file_name.clone(),
         },
     );
 
@@ -55,10 +63,10 @@ pub async fn transcribe_audio_file(
             status: "transcribing".to_string(),
             progress: 0.5,
             message: format!(
-                "Decoded {} samples ({}s), transcribing...",
-                audio_samples.len(),
+                "Decoded {} seconds, transcribing...",
                 audio_samples.len() / 16000
             ),
+            file_name: file_name.clone(),
         },
     );
 
@@ -84,6 +92,7 @@ pub async fn transcribe_audio_file(
             status: "saving".to_string(),
             progress: 0.9,
             message: "Saving to history...".to_string(),
+            file_name: file_name.clone(),
         },
     );
 
@@ -127,22 +136,16 @@ pub async fn transcribe_audio_file(
             status: "complete".to_string(),
             progress: 1.0,
             message: "Transcription complete!".to_string(),
+            file_name: file_name.clone(),
         },
     );
-
-    // Get file name for the completion event
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Unknown file")
-        .to_string();
 
     // Emit completion event with details for the dialog
     if let Err(e) = app.emit(
         "transcription-complete",
         json!({
             "text": transcription_text,
-            "fileName": file_name
+            "fileName": file_name.clone().unwrap_or_else(|| "Unknown file".to_string())
         })
     ) {
         error!("Failed to emit transcription-complete event: {}", e);
