@@ -1,5 +1,6 @@
 {
   "$schema": "https://schema.railpack.com",
+  "root": "apps/web",
   "packages": {
     "bun": "1.3"
   },
