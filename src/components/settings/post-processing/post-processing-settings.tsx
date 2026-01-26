@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  AlertTriangle,
   CheckIcon,
   PencilIcon,
   PlusIcon,
@@ -557,6 +558,18 @@ const PostProcessingSettingsPromptsComponent = () => {
                 </code>{" "}
                 to insert the transcribed text placeholder.
               </p>
+              {draftText.trim() &&
+                !draftText.includes("@output") &&
+                !draftText.includes("${output}") &&
+                !/\[[^\]]*\]\(mention:output\)/.test(draftText) && (
+                  <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    <p className="text-xs">
+                      No output placeholder found. The transcript will be
+                      automatically appended to the end of your prompt.
+                    </p>
+                  </div>
+                )}
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -617,13 +630,27 @@ const PostProcessingSettingsPromptsComponent = () => {
                 showToolbar
                 value={draftText}
               />
-              <p className="text-muted-foreground/70 text-xs">
-                Tip: Type{" "}
-                <code className="rounded bg-muted/20 px-1 py-0.5 text-xs">
-                  @output
-                </code>{" "}
-                to insert the transcribed text placeholder.
-              </p>
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground/70 text-xs">
+                  Tip: Type{" "}
+                  <code className="rounded bg-muted/20 px-1 py-0.5 text-xs">
+                    @output
+                  </code>{" "}
+                  to insert the transcribed text placeholder.
+                </p>
+                {draftText.trim() &&
+                  !draftText.includes("@output") &&
+                  !draftText.includes("${output}") &&
+                  !/\[[^\]]*\]\(mention:output\)/.test(draftText) && (
+                    <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-warning">
+                      <AlertTriangle className="h-4 w-4" />
+                      <p className="text-xs">
+                        No output placeholder found. The transcript will be
+                        automatically appended to the end of your prompt.
+                      </p>
+                    </div>
+                  )}
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">

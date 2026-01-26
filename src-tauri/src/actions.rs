@@ -244,7 +244,7 @@ impl ShortcutAction for TranscribeAction {
         if crate::is_file_transcription_active() {
             debug!("File transcription in progress - showing warning overlay");
             show_warning_overlay(app, "File transcription in progress. Please wait...");
-            
+
             // Reset the toggle state so next press will call start() again
             let toggle_state_manager = app.state::<ManagedToggleState>();
             if let Ok(mut states) = toggle_state_manager.lock() {
@@ -343,13 +343,17 @@ impl ShortcutAction for TranscribeAction {
             let stop_recording_time = Instant::now();
             if let Some(samples) = rm_for_task.stop_recording(&binding_id) {
                 debug!(
-                    "Recording stopped and samples retrieved in {:?}, sample count: {}",
+                    "Recording stopped and samples retrieved in {:?}, sample count: {} ({:.1}s audio)",
                     stop_recording_time.elapsed(),
-                    samples.len()
+                    samples.len(),
+                    samples.len() as f32 / 16000.0
                 );
 
+                // Final transcription: transcribe ALL audio for complete result
+                // (streaming preview is limited, but final result is complete)
                 let transcription_time = Instant::now();
-                let samples_clone = samples.clone(); // Clone for history saving
+                let samples_clone = samples.clone(); // Clone full samples for history saving
+
                 match tm.transcribe(samples) {
                     Ok(transcription) => {
                         debug!(

@@ -43,6 +43,12 @@ pub struct TranscriptionManager {
     watcher_handle: Arc<Mutex<Option<thread::JoinHandle<()>>>>,
     is_loading: Arc<Mutex<bool>>,
     loading_condvar: Arc<Condvar>,
+    streaming_buffer: Arc<Mutex<Vec<f32>>>,
+    last_partial_update: Arc<Mutex<std::time::Instant>>,
+    streaming_in_progress: Arc<AtomicBool>,
+    /// Adaptive max samples for streaming - dynamically adjusted based on transcription performance
+    /// Starts at None (no limit), then caps when transcription exceeds 800ms
+    adaptive_max_samples: Arc<Mutex<Option<usize>>>,
 }
 
 impl TranscriptionManager {
@@ -62,6 +68,10 @@ impl TranscriptionManager {
             watcher_handle: Arc::new(Mutex::new(None)),
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
+            streaming_buffer: Arc::new(Mutex::new(Vec::new())),
+            last_partial_update: Arc::new(Mutex::new(std::time::Instant::now())),
+            streaming_in_progress: Arc::new(AtomicBool::new(false)),
+            adaptive_max_samples: Arc::new(Mutex::new(None)),
         };
 
         // Start the idle watcher
@@ -352,14 +362,13 @@ impl TranscriptionManager {
                     let whisper_language = if settings.selected_language == "auto" {
                         None
                     } else {
-                        let normalized = if matches!(
-                            settings.selected_language.as_str(),
-                            "zh-Hans" | "zh-Hant"
-                        ) {
-                            "zh".to_string()
-                        } else {
-                            settings.selected_language.clone()
-                        };
+                        let normalized =
+                            if matches!(settings.selected_language.as_str(), "zh-Hans" | "zh-Hant")
+                            {
+                                "zh".to_string()
+                            } else {
+                                settings.selected_language.clone()
+                            };
                         Some(normalized)
                     };
 
@@ -403,7 +412,11 @@ impl TranscriptionManager {
         } else {
             ""
         };
-        info!("Transcription completed in {}ms{}", (et - st).as_millis(), translation_note);
+        info!(
+            "Transcription completed in {}ms{}",
+            (et - st).as_millis(),
+            translation_note
+        );
 
         // Check if we should immediately unload the model after transcription
         if settings.model_unload_timeout == ModelUnloadTimeout::Immediately {
@@ -414,6 +427,126 @@ impl TranscriptionManager {
         }
 
         Ok(corrected_result.trim().to_string())
+    }
+    pub fn start_streaming(&self) {
+        debug!("start_streaming called - clearing buffer and resetting adaptive limit");
+        let mut buf = self.streaming_buffer.lock().unwrap();
+        buf.clear();
+        *self.last_partial_update.lock().unwrap() = std::time::Instant::now();
+        // Reset adaptive limit for new recording session
+        *self.adaptive_max_samples.lock().unwrap() = None;
+    }
+
+    pub fn handle_streaming_chunk(&self, chunk: Vec<f32>) {
+        // Append chunk to buffer
+        let current_len = {
+            let mut buf = self.streaming_buffer.lock().unwrap();
+            buf.extend_from_slice(&chunk);
+            buf.len()
+        };
+
+        // Throttle updates to ~500ms
+        let now = std::time::Instant::now();
+        let mut last = self.last_partial_update.lock().unwrap();
+        let elapsed_ms = now.duration_since(*last).as_millis();
+
+        if elapsed_ms > 500 {
+            *last = now;
+            drop(last);
+
+            // Avoid transcribing extremely short buffers (need at least 1 second)
+            if current_len < 16000 {
+                return;
+            }
+
+            // Skip if a streaming transcription is already in progress
+            // This prevents parallel transcriptions and resource waste
+            if self.streaming_in_progress.swap(true, Ordering::SeqCst) {
+                debug!("Skipping streaming transcription - previous one still in progress");
+                return;
+            }
+
+            // Adaptive streaming: adjust max samples based on transcription performance
+            // Target: keep transcription time under 800ms for responsive UI
+            // Minimum: 5 seconds of audio for context (16000 * 5 = 80000 samples)
+            const MIN_STREAMING_SAMPLES: usize = 16000 * 5;
+            const TARGET_TRANSCRIPTION_MS: u128 = 800;
+
+            let adaptive_limit = *self.adaptive_max_samples.lock().unwrap();
+
+            // Get buffer to transcribe (limited by adaptive window)
+            let buf_to_transcribe = {
+                let buf = self.streaming_buffer.lock().unwrap();
+                match adaptive_limit {
+                    Some(max_samples) if buf.len() > max_samples => {
+                        // Sliding window - only transcribe last X samples
+                        buf[buf.len() - max_samples..].to_vec()
+                    }
+                    _ => {
+                        // No limit yet, transcribe full buffer
+                        buf.clone()
+                    }
+                }
+            };
+
+            // Calculate audio duration for logging
+            let audio_duration_secs = buf_to_transcribe.len() as f32 / 16000.0;
+            let samples_count = buf_to_transcribe.len();
+
+            let this = self.clone();
+
+            thread::spawn(move || {
+                let transcription_start = std::time::Instant::now();
+                if let Ok(text) = this.transcribe(buf_to_transcribe) {
+                    let transcription_ms = transcription_start.elapsed().as_millis();
+
+                    info!(
+                        "Partial transcription ({:.1}s audio, {}ms): '{}'",
+                        audio_duration_secs, transcription_ms, text
+                    );
+
+                    // Adaptive algorithm: if transcription exceeded target time, reduce the limit
+                    if transcription_ms > TARGET_TRANSCRIPTION_MS {
+                        let mut adaptive = this.adaptive_max_samples.lock().unwrap();
+
+                        match *adaptive {
+                            None => {
+                                // First time exceeding: set limit to current sample count
+                                let new_limit = samples_count.max(MIN_STREAMING_SAMPLES);
+                                info!(
+                                    "Adaptive limit set: {:.1}s ({}ms exceeded {}ms target)",
+                                    new_limit as f32 / 16000.0,
+                                    transcription_ms,
+                                    TARGET_TRANSCRIPTION_MS
+                                );
+                                *adaptive = Some(new_limit);
+                            }
+                            Some(current) => {
+                                // Already have a limit but still exceeding: reduce by 10%
+                                let reduced = (current as f32 * 0.9) as usize;
+                                let new_limit = reduced.max(MIN_STREAMING_SAMPLES);
+
+                                if new_limit < current {
+                                    info!(
+                                        "Adaptive limit reduced: {:.1}s -> {:.1}s ({}ms still exceeded {}ms)",
+                                        current as f32 / 16000.0,
+                                        new_limit as f32 / 16000.0,
+                                        transcription_ms,
+                                        TARGET_TRANSCRIPTION_MS
+                                    );
+                                    *adaptive = Some(new_limit);
+                                }
+                            }
+                        }
+                    }
+
+                    // Emit to recording overlay window (just the current window text)
+                    crate::overlay::emit_transcription_progress(&this.app_handle, &text);
+                }
+                // Mark streaming transcription as complete
+                this.streaming_in_progress.store(false, Ordering::SeqCst);
+            });
+        }
     }
 }
 
