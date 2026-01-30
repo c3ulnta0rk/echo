@@ -57,6 +57,10 @@ pub enum ModelUnloadTimeout {
 #[serde(rename_all = "snake_case")]
 pub enum PasteMethod {
     CtrlV,
+    /// Direct character input via enigo.text().
+    /// Only available on Linux - on macOS this causes cascading suffix duplication
+    /// in terminals like Ghostty due to CGEvent handling issues.
+    #[cfg(target_os = "linux")]
     Direct,
     #[cfg(not(target_os = "macos"))]
     ShiftInsert,
@@ -87,11 +91,9 @@ impl Default for ModelUnloadTimeout {
 
 impl Default for PasteMethod {
     fn default() -> Self {
-        // Default to CtrlV for macOS and Windows, Direct for Linux
-        #[cfg(target_os = "linux")]
-        return PasteMethod::Direct;
-        #[cfg(not(target_os = "linux"))]
-        return PasteMethod::CtrlV;
+        // CtrlV is the default on all platforms
+        // Direct is only available on Linux (buggy on macOS)
+        PasteMethod::CtrlV
     }
 }
 

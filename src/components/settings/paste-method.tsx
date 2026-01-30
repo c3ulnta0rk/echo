@@ -20,8 +20,13 @@ interface PasteMethodProps {
 const getPasteMethodOptions = (osType: string) => {
   const baseOptions = [
     { value: "ctrl_v", label: "Clipboard (Ctrl+V)" },
-    { value: "direct", label: "Direct" },
   ];
+
+  // Direct input only available on Linux
+  // On macOS it causes cascading suffix duplication in terminals like Ghostty
+  if (osType === "linux") {
+    baseOptions.push({ value: "direct", label: "Direct" });
+  }
 
   // Add Shift+Insert option for Windows and Linux only
   if (osType === "windows" || osType === "linux") {
