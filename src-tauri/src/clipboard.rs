@@ -3,13 +3,45 @@ use enigo::Enigo;
 use enigo::Key;
 use enigo::Keyboard;
 use enigo::Settings;
+use std::process::Command;
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
+
+/// Sends Ctrl+V using wtype (for Wayland)
+#[cfg(target_os = "linux")]
+fn send_paste_wayland_wtype() -> Result<(), String> {
+    // Attempt to use wtype to simulate Ctrl+V
+    // wtype -M ctrl -k v -m ctrl
+    let output = Command::new("wtype")
+        .arg("-M")
+        .arg("ctrl")
+        .arg("-k")
+        .arg("v")
+        .arg("-m")
+        .arg("ctrl")
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => Ok(()),
+        Ok(o) => Err(format!(
+            "wtype failed: {}",
+            String::from_utf8_lossy(&o.stderr)
+        )),
+        Err(e) => Err(format!("Failed to execute wtype: {}", e)),
+    }
+}
 
 /// Sends a Ctrl+V or Cmd+V paste command using platform-specific virtual key codes.
 /// This ensures the paste works regardless of keyboard layout (e.g., Russian, AZERTY, DVORAK).
 fn send_paste_ctrl_v() -> Result<(), String> {
     // Platform-specific key definitions
+    #[cfg(target_os = "linux")]
+    {
+        // On Wayland, we should use wtype if available, otherwise Enigo
+        if crate::wayland::is_wayland() {
+            return send_paste_wayland_wtype();
+        }
+    }
     #[cfg(target_os = "macos")]
     let (modifier_key, v_key_code) = (Key::Meta, Key::Other(9));
     #[cfg(target_os = "windows")]
@@ -82,6 +114,12 @@ fn paste_via_direct_input(text: &str) -> Result<(), String> {
 /// Pastes text using the clipboard method with Ctrl+V/Cmd+V.
 /// Saves the current clipboard, writes the text, sends paste command, then restores the clipboard.
 fn paste_via_clipboard_ctrl_v(text: &str, app_handle: &AppHandle) -> Result<(), String> {
+    // On Wayland, use wl-copy for better reliability if available
+    #[cfg(target_os = "linux")]
+    if crate::wayland::is_wayland() {
+        return paste_via_wayland_clipboard(text);
+    }
+
     let clipboard = app_handle.clipboard();
 
     // get the current clipboard content
@@ -157,4 +195,33 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn paste_via_wayland_clipboard(text: &str) -> Result<(), String> {
+    // 1. Write to clipboard using wl-copy
+    use std::io::Write;
+    let mut child = Command::new("wl-copy")
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn wl-copy: {}", e))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("Failed to write to wl-copy stdin: {}", e))?;
+    }
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait for wl-copy: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("wl-copy failed with status: {}", status));
+    }
+
+    // 2. Simulate paste using wtype
+    // Small delay to ensure clipboard is ready
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    send_paste_wayland_wtype()
 }
