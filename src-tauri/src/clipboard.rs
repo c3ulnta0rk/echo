@@ -3,45 +3,28 @@ use enigo::Enigo;
 use enigo::Key;
 use enigo::Keyboard;
 use enigo::Settings;
-use std::process::Command;
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-/// Sends Ctrl+V using wtype (for Wayland)
-#[cfg(target_os = "linux")]
-fn send_paste_wayland_wtype() -> Result<(), String> {
-    // Attempt to use wtype to simulate Ctrl+V
-    // wtype -M ctrl -k v -m ctrl
-    let output = Command::new("wtype")
-        .arg("-M")
-        .arg("ctrl")
-        .arg("-k")
-        .arg("v")
-        .arg("-m")
-        .arg("ctrl")
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => Ok(()),
-        Ok(o) => Err(format!(
-            "wtype failed: {}",
-            String::from_utf8_lossy(&o.stderr)
-        )),
-        Err(e) => Err(format!("Failed to execute wtype: {}", e)),
-    }
-}
+// Wayland auto-paste: not supported.
+//
+// Tested approaches that do NOT work on GNOME Wayland:
+// - wtype (zwp_virtual_keyboard_v1): commands execute but keystrokes are not
+//   delivered to the focused window. The overlay steals focus, and even after
+//   hiding it + waiting for the compositor to return focus, wtype keystrokes
+//   are silently dropped.
+// - wl-copy + wtype Ctrl+V: same focus issue — wtype can't simulate Ctrl+V
+//   into the correct window.
+// - enigo (libxdo backend): X11-only, does not work on Wayland at all.
+// - Reordering hide-overlay → delay → paste: the compositor focus return
+//   timing is unreliable, keystrokes still go to the wrong window.
+//
+// On Wayland, the paste method is forced to ClipboardOnly. The user pastes
+// manually with Ctrl+V.
 
 /// Sends a Ctrl+V or Cmd+V paste command using platform-specific virtual key codes.
 /// This ensures the paste works regardless of keyboard layout (e.g., Russian, AZERTY, DVORAK).
 fn send_paste_ctrl_v() -> Result<(), String> {
-    // Platform-specific key definitions
-    #[cfg(target_os = "linux")]
-    {
-        // On Wayland, we should use wtype if available, otherwise Enigo
-        if crate::wayland::is_wayland() {
-            return send_paste_wayland_wtype();
-        }
-    }
     #[cfg(target_os = "macos")]
     let (modifier_key, v_key_code) = (Key::Meta, Key::Other(9));
     #[cfg(target_os = "windows")]
@@ -100,6 +83,7 @@ fn send_paste_shift_insert() -> Result<(), String> {
 
 /// Pastes text directly using the enigo text method.
 /// This tries to use system input methods if possible, otherwise simulates keystrokes one by one.
+/// Note: enigo uses X11/libxdo on Linux, so this only works on X11.
 fn paste_via_direct_input(text: &str) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default())
         .map_err(|e| format!("Failed to initialize Enigo: {}", e))?;
@@ -114,12 +98,6 @@ fn paste_via_direct_input(text: &str) -> Result<(), String> {
 /// Pastes text using the clipboard method with Ctrl+V/Cmd+V.
 /// Saves the current clipboard, writes the text, sends paste command, then restores the clipboard.
 fn paste_via_clipboard_ctrl_v(text: &str, app_handle: &AppHandle) -> Result<(), String> {
-    // On Wayland, use wl-copy for better reliability if available
-    #[cfg(target_os = "linux")]
-    if crate::wayland::is_wayland() {
-        return paste_via_wayland_clipboard(text);
-    }
-
     let clipboard = app_handle.clipboard();
 
     // get the current clipboard content
@@ -172,9 +150,29 @@ fn paste_via_clipboard_shift_insert(text: &str, app_handle: &AppHandle) -> Resul
     Ok(())
 }
 
+fn copy_to_clipboard(text: &str, app_handle: &AppHandle) -> Result<(), String> {
+    let clipboard = app_handle.clipboard();
+    clipboard
+        .write_text(text)
+        .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
+    log::info!("Text copied to clipboard (clipboard-only mode)");
+    Ok(())
+}
+
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let settings = get_settings(&app_handle);
-    let paste_method = settings.paste_method;
+    let mut paste_method = settings.paste_method;
+
+    // On Wayland, force clipboard-only mode — auto-paste is not supported
+    // (see comment at the top of this file for details).
+    #[cfg(target_os = "linux")]
+    if crate::wayland::is_wayland() && paste_method != PasteMethod::ClipboardOnly {
+        log::info!(
+            "Wayland session detected: overriding paste method {:?} → ClipboardOnly",
+            paste_method
+        );
+        paste_method = PasteMethod::ClipboardOnly;
+    }
 
     log::info!("Using paste method: {:?}", paste_method);
 
@@ -184,6 +182,9 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
         PasteMethod::Direct => paste_via_direct_input(&text)?,
         #[cfg(not(target_os = "macos"))]
         PasteMethod::ShiftInsert => paste_via_clipboard_shift_insert(&text, &app_handle)?,
+        PasteMethod::ClipboardOnly => {
+            return copy_to_clipboard(&text, &app_handle);
+        }
     }
 
     // After pasting, optionally copy to clipboard based on settings
@@ -195,33 +196,4 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn paste_via_wayland_clipboard(text: &str) -> Result<(), String> {
-    // 1. Write to clipboard using wl-copy
-    use std::io::Write;
-    let mut child = Command::new("wl-copy")
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn wl-copy: {}", e))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(text.as_bytes())
-            .map_err(|e| format!("Failed to write to wl-copy stdin: {}", e))?;
-    }
-
-    let status = child
-        .wait()
-        .map_err(|e| format!("Failed to wait for wl-copy: {}", e))?;
-
-    if !status.success() {
-        return Err(format!("wl-copy failed with status: {}", status));
-    }
-
-    // 2. Simulate paste using wtype
-    // Small delay to ensure clipboard is ready
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    send_paste_wayland_wtype()
 }

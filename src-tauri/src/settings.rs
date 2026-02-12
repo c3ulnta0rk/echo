@@ -60,6 +60,7 @@ pub enum PasteMethod {
     Direct,
     #[cfg(not(target_os = "macos"))]
     ShiftInsert,
+    ClipboardOnly,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,9 +88,15 @@ impl Default for ModelUnloadTimeout {
 
 impl Default for PasteMethod {
     fn default() -> Self {
-        // Default to CtrlV for macOS and Windows, Direct for Linux
         #[cfg(target_os = "linux")]
-        return PasteMethod::Direct;
+        {
+            // On Wayland, auto-paste is not supported (see clipboard.rs).
+            // Default to ClipboardOnly — user pastes manually with Ctrl+V.
+            if crate::wayland::is_wayland() {
+                return PasteMethod::ClipboardOnly;
+            }
+            return PasteMethod::Direct;
+        }
         #[cfg(not(target_os = "linux"))]
         return PasteMethod::CtrlV;
     }
