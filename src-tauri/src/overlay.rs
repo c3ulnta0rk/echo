@@ -131,16 +131,6 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         .focused(false)
         .visible(false);
 
-        // On Wayland, some window hints may behave differently
-        // The overlay should still work but may have compositor-specific behavior
-        #[cfg(target_os = "linux")]
-        if is_wayland_session {
-            // Wayland compositors handle always_on_top differently
-            // GNOME/Mutter and KDE/KWin both support it but may require
-            // the window to be "above" type
-            debug!("[Overlay] Wayland: always_on_top behavior depends on compositor");
-        }
-
         match builder.build() {
             Ok(window) => {
                 // Initialize Layer Shell on Wayland for proper overlay behavior
@@ -156,15 +146,15 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                             // doesn't support wlr-layer-shell.
                             // Use configure only (don't present yet) to avoid showing empty window at startup.
                             info!("[Overlay] Applying GNOME/Mutter fallback configuration");
-                            // crate::wayland::configure_gnome_overlay(&window); // Potential source of panic on startup
+                            crate::wayland::configure_gnome_overlay(&window);
                         }
                     }
                 }
 
-                // Enable click-through on transparent areas
-                if let Err(e) = window.set_ignore_cursor_events(true) {
-                    warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
-                }
+                // NOTE: Do NOT call set_ignore_cursor_events here.
+                // On Wayland, the GdkWindow doesn't exist yet for a hidden window,
+                // and tao panics at event_loop.rs:449 (unwrap on None from gtk_widget_get_window).
+                // We defer it to show_recording_overlay() when the window is realized.
 
                 info!("[Overlay] Recording overlay window created successfully");
             }
@@ -199,6 +189,10 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
             if let Err(e) = overlay_window.show() {
                 error!("[Overlay] Failed to show overlay window: {}", e);
                 return;
+            }
+            // Enable click-through now that the window is realized (GdkWindow exists)
+            if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
+                warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
             }
             // On Wayland, we handle positioning via layer shell anchors
             #[cfg(target_os = "linux")]
