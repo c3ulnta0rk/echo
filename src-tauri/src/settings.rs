@@ -64,6 +64,7 @@ pub enum PasteMethod {
     Direct,
     #[cfg(not(target_os = "macos"))]
     ShiftInsert,
+    ClipboardOnly,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,9 +92,17 @@ impl Default for ModelUnloadTimeout {
 
 impl Default for PasteMethod {
     fn default() -> Self {
-        // CtrlV is the default on all platforms
-        // Direct is only available on Linux (buggy on macOS)
-        PasteMethod::CtrlV
+        #[cfg(target_os = "linux")]
+        {
+            // On Wayland, auto-paste is not supported (see clipboard.rs).
+            // Default to ClipboardOnly — user pastes manually with Ctrl+V.
+            if crate::wayland::is_wayland() {
+                return PasteMethod::ClipboardOnly;
+            }
+            return PasteMethod::Direct;
+        }
+        #[cfg(not(target_os = "linux"))]
+        return PasteMethod::CtrlV;
     }
 }
 
@@ -367,15 +376,40 @@ fn default_post_process_prompts() -> Vec<LLMPrompt> {
 
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
-pub fn get_default_settings() -> AppSettings {
+/// Get the default shortcut for the current platform and display server.
+///
+/// On Linux Wayland, uses Ctrl+Shift+Space to avoid conflicts (Wayland shortcuts
+/// don't consume keyboard events, so Ctrl+Space would also trigger in the active app).
+fn get_default_shortcut() -> &'static str {
     #[cfg(target_os = "windows")]
-    let default_shortcut = "ctrl+space";
+    {
+        "ctrl+space"
+    }
     #[cfg(target_os = "macos")]
-    let default_shortcut = "option+space";
+    {
+        "option+space"
+    }
     #[cfg(target_os = "linux")]
-    let default_shortcut = "ctrl+space";
+    {
+        // On Wayland, use Ctrl+Shift+Space to avoid conflicts
+        // (Wayland shortcuts don't consume keyboard events)
+        if std::env::var("XDG_SESSION_TYPE")
+            .map(|s| s.eq_ignore_ascii_case("wayland"))
+            .unwrap_or(false)
+        {
+            "ctrl+shift+space"
+        } else {
+            "ctrl+space"
+        }
+    }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    let default_shortcut = "alt+space";
+    {
+        "alt+space"
+    }
+}
+
+pub fn get_default_settings() -> AppSettings {
+    let default_shortcut = get_default_shortcut();
 
     let mut bindings = HashMap::new();
     bindings.insert(

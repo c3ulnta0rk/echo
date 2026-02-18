@@ -6,10 +6,25 @@ use enigo::Settings;
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
+// Wayland auto-paste: not supported.
+//
+// Tested approaches that do NOT work on GNOME Wayland:
+// - wtype (zwp_virtual_keyboard_v1): commands execute but keystrokes are not
+//   delivered to the focused window. The overlay steals focus, and even after
+//   hiding it + waiting for the compositor to return focus, wtype keystrokes
+//   are silently dropped.
+// - wl-copy + wtype Ctrl+V: same focus issue — wtype can't simulate Ctrl+V
+//   into the correct window.
+// - enigo (libxdo backend): X11-only, does not work on Wayland at all.
+// - Reordering hide-overlay → delay → paste: the compositor focus return
+//   timing is unreliable, keystrokes still go to the wrong window.
+//
+// On Wayland, the paste method is forced to ClipboardOnly. The user pastes
+// manually with Ctrl+V.
+
 /// Sends a Ctrl+V or Cmd+V paste command using platform-specific virtual key codes.
 /// This ensures the paste works regardless of keyboard layout (e.g., Russian, AZERTY, DVORAK).
 fn send_paste_ctrl_v() -> Result<(), String> {
-    // Platform-specific key definitions
     #[cfg(target_os = "macos")]
     let (modifier_key, v_key_code) = (Key::Meta, Key::Other(9));
     #[cfg(target_os = "windows")]
@@ -68,9 +83,9 @@ fn send_paste_shift_insert() -> Result<(), String> {
 
 /// Pastes text directly using the enigo text method.
 /// This tries to use system input methods if possible, otherwise simulates keystrokes one by one.
-///
 /// NOTE: Only available on Linux. On macOS, this causes cascading suffix duplication
 /// in terminals like Ghostty due to CGEvent handling issues.
+/// On Linux, enigo uses X11/libxdo, so this only works on X11 (not Wayland).
 #[cfg(target_os = "linux")]
 fn paste_via_direct_input(text: &str) -> Result<(), String> {
     log::debug!(
@@ -168,9 +183,29 @@ fn paste_via_clipboard_shift_insert(text: &str, app_handle: &AppHandle) -> Resul
     Ok(())
 }
 
+fn copy_to_clipboard(text: &str, app_handle: &AppHandle) -> Result<(), String> {
+    let clipboard = app_handle.clipboard();
+    clipboard
+        .write_text(text)
+        .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
+    log::info!("Text copied to clipboard (clipboard-only mode)");
+    Ok(())
+}
+
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let settings = get_settings(&app_handle);
-    let paste_method = settings.paste_method;
+    let mut paste_method = settings.paste_method;
+
+    // On Wayland, force clipboard-only mode — auto-paste is not supported
+    // (see comment at the top of this file for details).
+    #[cfg(target_os = "linux")]
+    if crate::wayland::is_wayland() && paste_method != PasteMethod::ClipboardOnly {
+        log::info!(
+            "Wayland session detected: overriding paste method {:?} → ClipboardOnly",
+            paste_method
+        );
+        paste_method = PasteMethod::ClipboardOnly;
+    }
 
     log::info!(
         "paste(): method={:?}, text_len={}, text='{}'",
@@ -190,6 +225,9 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
         PasteMethod::Direct => paste_via_direct_input(&text)?,
         #[cfg(not(target_os = "macos"))]
         PasteMethod::ShiftInsert => paste_via_clipboard_shift_insert(&text, &app_handle)?,
+        PasteMethod::ClipboardOnly => {
+            return copy_to_clipboard(&text, &app_handle);
+        }
     }
 
     // After pasting, optionally copy to clipboard based on settings
@@ -303,8 +341,7 @@ mod tests {
     fn bug_terminal_output_should_not_have_duplication() {
         // Simulated terminal output with the Direct paste bug
         // (This is what actually appears in terminals like Ghostty)
-        let buggy_terminal_output =
-            "hello world hello world"; // Text appears twice due to enigo.text() bug
+        let buggy_terminal_output = "hello world hello world"; // Text appears twice due to enigo.text() bug
 
         // This assertion FAILS - documenting the bug
         // The terminal output SHOULD NOT have duplication, but it does
@@ -348,7 +385,8 @@ mod tests {
         // Simulated buggy output pattern based on actual terminal output from logs:
         // The text "...la transcription." appears multiple times as each cascading
         // suffix ends at the same point
-        let buggy_output = "Je fais un test la transcription.copier la transcription.sens la transcription.";
+        let buggy_output =
+            "Je fais un test la transcription.copier la transcription.sens la transcription.";
 
         // Check for the cascading suffix pattern:
         // The text should NOT end with repeated suffixes
@@ -414,7 +452,9 @@ mod tests {
 
         // Normal text (should not detect)
         assert!(!detect_cascading_suffix_pattern("hello world"));
-        assert!(!detect_cascading_suffix_pattern("this is normal text without repetition"));
+        assert!(!detect_cascading_suffix_pattern(
+            "this is normal text without repetition"
+        ));
         assert!(!detect_cascading_suffix_pattern("short"));
     }
 
