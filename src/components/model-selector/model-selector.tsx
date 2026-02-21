@@ -291,7 +291,10 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onError }) => {
       return null;
     }
     if (modelDownloadProgress.size === 1) {
-      const [progress] = Array.from(modelDownloadProgress.values());
+      const progress = Array.from(modelDownloadProgress.values())[0];
+      if (!progress) {
+        return "Downloading...";
+      }
       const percentage = Math.max(
         0,
         Math.min(100, Math.round(progress.percentage))

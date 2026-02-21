@@ -38,6 +38,9 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   if (progress.length === 1) {
     // Single progress bar
     const item = progress[0];
+    if (!item) {
+      return null;
+    }
     const percentage = Math.max(0, Math.min(100, item.percentage));
 
     return (

@@ -209,7 +209,9 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       }
 
       const file = files[0];
-      await processFile(file);
+      if (file) {
+        await processFile(file);
+      }
     },
     [processFile]
   );
@@ -223,7 +225,9 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
       }
 
       const file = files[0];
-      await processFile(file);
+      if (file) {
+        await processFile(file);
+      }
     },
     [processFile]
   );

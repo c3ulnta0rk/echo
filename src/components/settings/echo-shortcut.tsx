@@ -378,7 +378,7 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
         const primaryBinding = Object.values(bindings)[0];
         const primaryId = Object.keys(bindings)[0];
 
-        if (!primaryBinding) {
+        if (!(primaryBinding && primaryId)) {
           return (
             <div className="text-muted-foreground text-sm">
               No shortcuts configured

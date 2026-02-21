@@ -161,7 +161,7 @@ export const Waveform = ({
     );
 
     if (dataIndex >= 0 && dataIndex < data.length) {
-      onBarClick(dataIndex, data[dataIndex]);
+      onBarClick(dataIndex, data[dataIndex] ?? 0);
     }
   };
 
@@ -684,12 +684,18 @@ export const MicrophoneWaveform = ({
           const normalizedData: number[] = [];
 
           for (let i = halfLength - 1; i >= 0; i--) {
-            const value = Math.min(1, (relevantData[i] / 255) * sensitivity);
+            const value = Math.min(
+              1,
+              ((relevantData[i] ?? 0) / 255) * sensitivity
+            );
             normalizedData.push(value);
           }
 
           for (let i = 0; i < halfLength; i++) {
-            const value = Math.min(1, (relevantData[i] / 255) * sensitivity);
+            const value = Math.min(
+              1,
+              ((relevantData[i] ?? 0) / 255) * sensitivity
+            );
             normalizedData.push(value);
           }
 

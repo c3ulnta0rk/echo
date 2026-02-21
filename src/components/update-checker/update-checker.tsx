@@ -83,7 +83,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
       }
       updateUnlisten.then((fn) => fn());
     };
-  }, [checkForUpdates]);
+  }, [checkForUpdates, handleManualUpdateCheck]);
 
   const installUpdate = async () => {
     try {
@@ -164,7 +164,7 @@ const UpdateChecker: React.FC<UpdateCheckerProps> = ({ className = "" }) => {
   const showSpinner = isChecking || (isInstalling && downloadProgress === 0);
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={cn("flex items-center gap-3", className)}>
       <Button
         className={cn(
           "min-w-32 items-center gap-2",

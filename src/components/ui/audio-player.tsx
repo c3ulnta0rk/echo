@@ -185,7 +185,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     const centerY = rect.height / 2;
 
     for (let i = 0; i < barCount; i++) {
-      const value = waveformData[i];
+      const value = waveformData[i] ?? 0;
       const barHeight = Math.max(4, value * rect.height * 0.85);
       const x = startX + i * step;
       const y = centerY - barHeight / 2;

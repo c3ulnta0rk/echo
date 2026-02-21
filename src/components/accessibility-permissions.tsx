@@ -3,6 +3,7 @@ import {
   checkAccessibilityPermission,
   requestAccessibilityPermission,
 } from "tauri-plugin-macos-permissions-api";
+import { cn } from "@/lib/utils";
 
 // Define permission state type
 type PermissionState = "request" | "verify" | "granted";
@@ -87,7 +88,7 @@ export const AccessibilityPermissions = () => {
           </p>
         </div>
         <button
-          className={`min-h-10 ${config.className}`}
+          className={cn("min-h-10", config.className)}
           onClick={handleButtonClick}
           type="button"
         >

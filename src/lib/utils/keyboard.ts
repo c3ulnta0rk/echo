@@ -180,7 +180,7 @@ export const normalizeKey = (key: string): string => {
   // Handle left/right variants of modifier keys
   if (key.startsWith("left ") || key.startsWith("right ")) {
     const parts = key.split(" ");
-    if (parts.length === 2) {
+    if (parts.length === 2 && parts[1]) {
       // Return just the modifier name without left/right prefix
       return parts[1];
     }

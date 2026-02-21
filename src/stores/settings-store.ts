@@ -340,21 +340,28 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const originalBinding = settings?.bindings?.[id]?.current_binding;
 
     // Batch isUpdating + optimistic update
-    set((state) => ({
-      isUpdating: { ...state.isUpdating, [updateKey]: true },
-      settings: state.settings
-        ? {
-            ...state.settings,
-            bindings: {
-              ...state.settings.bindings,
-              [id]: {
-                ...state.settings.bindings[id],
-                current_binding: binding,
-              },
+    set((state) => {
+      if (!state.settings) {
+        return { isUpdating: { ...state.isUpdating, [updateKey]: true } };
+      }
+      const existingBinding = state.settings.bindings[id];
+      if (!existingBinding) {
+        return { isUpdating: { ...state.isUpdating, [updateKey]: true } };
+      }
+      return {
+        isUpdating: { ...state.isUpdating, [updateKey]: true },
+        settings: {
+          ...state.settings,
+          bindings: {
+            ...state.settings.bindings,
+            [id]: {
+              ...existingBinding,
+              current_binding: binding,
             },
-          }
-        : null,
-    }));
+          },
+        },
+      };
+    });
 
     try {
       await invoke("change_binding", { id, binding });
@@ -363,20 +370,27 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
       // Rollback on error
       if (originalBinding && settings) {
-        set((state) => ({
-          settings: state.settings
-            ? {
-                ...state.settings,
-                bindings: {
-                  ...state.settings.bindings,
-                  [id]: {
-                    ...state.settings.bindings[id],
-                    current_binding: originalBinding,
-                  },
+        set((state) => {
+          if (!state.settings) {
+            return {};
+          }
+          const existingBinding = state.settings.bindings[id];
+          if (!existingBinding) {
+            return {};
+          }
+          return {
+            settings: {
+              ...state.settings,
+              bindings: {
+                ...state.settings.bindings,
+                [id]: {
+                  ...existingBinding,
+                  current_binding: originalBinding,
                 },
-              }
-            : null,
-        }));
+              },
+            },
+          };
+        });
       }
     } finally {
       set((state) => ({ isUpdating: omitKey(state.isUpdating, updateKey) }));

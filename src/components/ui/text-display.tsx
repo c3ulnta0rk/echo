@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { SettingContainer } from "./setting-container";
 
@@ -60,7 +61,11 @@ export const TextDisplay: React.FC<TextDisplayProps> = ({
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <div
-            className={`flex min-h-8 items-center rounded-lg border border-border/80 bg-muted/10 px-2 py-2 text-xs ${textClasses} ${value ? "" : "opacity-60"}`}
+            className={cn(
+              "flex min-h-8 items-center rounded-lg border border-border/80 bg-muted/10 px-2 py-2 text-xs",
+              textClasses,
+              !value && "opacity-60"
+            )}
           >
             {displayValue}
           </div>

@@ -357,7 +357,10 @@ export const useModelStore = create<ModelStore>((set, get) => ({
 
     if (downloadProgress.size > 0) {
       if (downloadProgress.size === 1) {
-        const [progress] = Array.from(downloadProgress.values());
+        const progress = Array.from(downloadProgress.values())[0];
+        if (!progress) {
+          return "Downloading...";
+        }
         const percentage = Math.max(
           0,
           Math.min(100, Math.round(progress.percentage))
