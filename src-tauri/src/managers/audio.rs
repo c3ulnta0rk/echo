@@ -1,9 +1,11 @@
+use crate::actions::OPERATION_GENERATION;
 use crate::audio_toolkit::{list_input_devices, vad::SmoothedVad, AudioRecorder, SileroVad};
 use crate::helpers::clamshell;
 use crate::managers::transcription::TranscriptionManager;
 use crate::settings::{get_settings, AppSettings};
 use crate::utils;
 use log::{debug, info};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::Manager;
@@ -382,13 +384,14 @@ impl AudioRecordingManager {
 
                     // Ensure model is loaded for streaming
                     tm.initiate_model_load();
-                    tm.start_streaming();
+                    let generation = OPERATION_GENERATION.load(Ordering::SeqCst);
+                    tm.start_streaming(generation);
 
                     let binding_id_clone = binding_id.to_string();
                     std::thread::spawn(move || {
                         debug!("Streaming thread started for binding {}", binding_id_clone);
                         while let Ok(chunk) = chunk_rx.recv() {
-                            tm.handle_streaming_chunk(chunk);
+                            tm.handle_streaming_chunk(chunk, generation);
                         }
                         debug!("Streaming thread finished");
                     });

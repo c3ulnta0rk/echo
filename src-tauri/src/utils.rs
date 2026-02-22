@@ -1,6 +1,8 @@
+use crate::actions::{OPERATION_GENERATION, TRANSCRIPTION_TASK};
 use crate::managers::audio::AudioRecordingManager;
 use crate::ManagedToggleState;
 use log::{info, warn};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
@@ -14,6 +16,16 @@ pub use crate::tray::*;
 /// Handles cancelling both recording and transcription operations and updates UI state.
 pub fn cancel_current_operation(app: &AppHandle) {
     info!("Initiating operation cancellation...");
+
+    // Increment generation to invalidate any in-flight stop/transcription tasks
+    OPERATION_GENERATION.fetch_add(1, Ordering::SeqCst);
+
+    // Abort any in-flight transcription task
+    if let Ok(mut task) = TRANSCRIPTION_TASK.lock() {
+        if let Some(handle) = task.take() {
+            handle.abort();
+        }
+    }
 
     // Cancel any ongoing recording FIRST (before resetting toggle states)
     // This ensures the audio stream is stopped before any cleanup

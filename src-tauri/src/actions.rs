@@ -16,10 +16,22 @@ use ferrous_opencc::{config::BuiltinConfig, OpenCC};
 use log::{debug, error, info};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Manager;
+
+/// Monotonically increasing counter that increments on every `start()` and `cancel()`.
+/// In-flight async tasks capture the current value and bail out when it changes,
+/// preventing stale transcription paste, overlay updates, and mute operations.
+pub(crate) static OPERATION_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// Handle to the most recent async transcription task spawned by `stop()`.
+/// On a new stop or cancel we abort the previous handle so stale LLM
+/// post-processing API calls don't continue running.
+pub(crate) static TRANSCRIPTION_TASK: Lazy<Mutex<Option<tauri::async_runtime::JoinHandle<()>>>> =
+    Lazy::new(|| Mutex::new(None));
 
 // Shortcut Action Trait
 pub trait ShortcutAction: Send + Sync {
@@ -240,6 +252,9 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
+        // Increment generation to invalidate any in-flight operations from previous recordings
+        OPERATION_GENERATION.fetch_add(1, Ordering::SeqCst);
+
         // Check if a file transcription is currently active
         if crate::is_file_transcription_active() {
             debug!("File transcription in progress - showing warning overlay");
@@ -275,12 +290,24 @@ impl ShortcutAction for TranscribeAction {
             let app_clone = app.clone();
             // The blocking helper exits immediately if audio feedback is disabled,
             // so we can reuse this thread regardless of user settings.
+            let gen = OPERATION_GENERATION.load(Ordering::SeqCst);
             std::thread::spawn(move || {
                 play_feedback_sound_blocking(&app_clone, SoundType::Start);
-                rm_clone.apply_mute();
+                if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
+                    rm_clone.apply_mute();
+                }
             });
 
             let recording_started = rm.try_start_recording(&binding_id);
+            if !recording_started {
+                // Reset toggle state and revert UI when recording fails to start
+                let toggle_state_manager = app.state::<ManagedToggleState>();
+                if let Ok(mut states) = toggle_state_manager.lock() {
+                    states.active_toggles.insert(binding_id.clone(), false);
+                }
+                utils::hide_recording_overlay(app);
+                change_tray_icon(app, TrayIconState::Idle);
+            }
             debug!("Recording started: {}", recording_started);
         } else {
             // On-demand mode: Start recording first, then play audio feedback, then apply mute
@@ -292,15 +319,25 @@ impl ShortcutAction for TranscribeAction {
                 // Small delay to ensure microphone stream is active
                 let app_clone = app.clone();
                 let rm_clone = Arc::clone(&rm);
+                let gen = OPERATION_GENERATION.load(Ordering::SeqCst);
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                     debug!("Handling delayed audio feedback/mute sequence");
                     // Helper handles disabled audio feedback by returning early,
                     // so we reuse it to keep mute sequencing consistent in every mode.
                     play_feedback_sound_blocking(&app_clone, SoundType::Start);
-                    rm_clone.apply_mute();
+                    if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
+                        rm_clone.apply_mute();
+                    }
                 });
             } else {
+                // Reset toggle state and revert UI when recording fails to start
+                let toggle_state_manager = app.state::<ManagedToggleState>();
+                if let Ok(mut states) = toggle_state_manager.lock() {
+                    states.active_toggles.insert(binding_id.clone(), false);
+                }
+                utils::hide_recording_overlay(app);
+                change_tray_icon(app, TrayIconState::Idle);
                 debug!("Failed to start recording");
             }
         }
@@ -333,7 +370,17 @@ impl ShortcutAction for TranscribeAction {
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
         let rm_for_task = Arc::clone(&rm);
 
-        tauri::async_runtime::spawn(async move {
+        // Capture current generation to detect staleness
+        let gen = OPERATION_GENERATION.load(Ordering::SeqCst);
+
+        // Abort any previous in-flight transcription task
+        if let Ok(mut task) = TRANSCRIPTION_TASK.lock() {
+            if let Some(handle) = task.take() {
+                handle.abort();
+            }
+        }
+
+        let handle = tauri::async_runtime::spawn(async move {
             let binding_id = binding_id.clone(); // Clone for the inner async task
             debug!(
                 "Starting async transcription task for binding: {}",
@@ -419,6 +466,12 @@ impl ShortcutAction for TranscribeAction {
                                 }
                             });
 
+                            // Check if this operation is still current before pasting
+                            if OPERATION_GENERATION.load(Ordering::SeqCst) != gen {
+                                debug!("Operation became stale during transcription, skipping paste");
+                                return;
+                            }
+
                             // Paste the final text (either processed or original)
                             let ah_clone = ah.clone();
                             let paste_time = Instant::now();
@@ -436,26 +489,37 @@ impl ShortcutAction for TranscribeAction {
                             })
                             .unwrap_or_else(|e| {
                                 error!("Failed to run paste on main thread: {:?}", e);
-                                utils::hide_recording_overlay(&ah);
-                                change_tray_icon(&ah, TrayIconState::Idle);
+                                if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
+                                    utils::hide_recording_overlay(&ah);
+                                    change_tray_icon(&ah, TrayIconState::Idle);
+                                }
                             });
-                        } else {
+                        } else if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
                             utils::hide_recording_overlay(&ah);
                             change_tray_icon(&ah, TrayIconState::Idle);
                         }
                     }
                     Err(err) => {
                         debug!("Global Shortcut Transcription error: {}", err);
-                        utils::hide_recording_overlay(&ah);
-                        change_tray_icon(&ah, TrayIconState::Idle);
+                        if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
+                            utils::hide_recording_overlay(&ah);
+                            change_tray_icon(&ah, TrayIconState::Idle);
+                        }
                     }
                 }
             } else {
                 debug!("No samples retrieved from recording stop");
-                utils::hide_recording_overlay(&ah);
-                change_tray_icon(&ah, TrayIconState::Idle);
+                if OPERATION_GENERATION.load(Ordering::SeqCst) == gen {
+                    utils::hide_recording_overlay(&ah);
+                    change_tray_icon(&ah, TrayIconState::Idle);
+                }
             }
         });
+
+        // Store the new task handle for potential abortion
+        if let Ok(mut task) = TRANSCRIPTION_TASK.lock() {
+            *task = Some(handle);
+        }
 
         debug!(
             "TranscribeAction::stop completed in {:?}",

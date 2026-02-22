@@ -1,7 +1,9 @@
 use crate::settings::{self, OverlayPosition};
 #[cfg(not(target_os = "linux"))]
 use enigo::{Enigo, Mouse};
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
+#[cfg(target_os = "linux")]
+use log::error;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 #[cfg(not(target_os = "linux"))]
 use tauri::{PhysicalPosition, PhysicalSize};
@@ -96,7 +98,9 @@ fn get_full_screen_dimensions(app_handle: &AppHandle) -> Option<(f64, f64, f64, 
     None
 }
 
-/// Creates the recording overlay window as a full-screen transparent window (hidden by default)
+/// Creates the recording overlay window as a full-screen transparent, always-visible window.
+/// The React component initializes in its CSS-hidden state (opacity-0), so no flash occurs.
+/// The window must be visible from creation for `always_on_top` to work reliably on macOS.
 pub fn create_recording_overlay(app_handle: &AppHandle) {
     #[cfg(target_os = "linux")]
     let is_wayland_session = crate::wayland::is_wayland();
@@ -132,7 +136,7 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         .skip_taskbar(true)
         .transparent(true)
         .focused(false)
-        .visible(false);
+        .visible(true);
 
         // On Wayland, some window hints may behave differently
         // The overlay should still work but may have compositor-specific behavior
@@ -164,10 +168,10 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     }
                 }
 
-                // NOTE: Do NOT call set_ignore_cursor_events here.
-                // On Wayland, the GdkWindow doesn't exist yet for a hidden window,
-                // and tao panics at event_loop.rs:449 (unwrap on None from gtk_widget_get_window).
-                // We defer it to show_recording_overlay() when the window is realized.
+                // Window is visible from creation — enable click-through immediately
+                if let Err(e) = _window.set_ignore_cursor_events(true) {
+                    warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
+                }
 
                 info!("[Overlay] Recording overlay window created successfully");
             }
@@ -199,14 +203,6 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
 
         if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
             debug!("[Overlay] Showing recording overlay");
-            if let Err(e) = overlay_window.show() {
-                error!("[Overlay] Failed to show overlay window: {}", e);
-                return;
-            }
-            // Enable click-through now that the window is realized (GdkWindow exists)
-            if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
-                warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
-            }
             // On Wayland, we handle positioning via layer shell anchors
             #[cfg(target_os = "linux")]
             {
@@ -238,14 +234,19 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
                     crate::wayland::present_gnome_overlay(&overlay_window);
                 }
             }
-            // Emit position preference to frontend for CSS positioning
+            // Delay emit so the OS window manager finishes repositioning
+            // before the frontend animates (fixes secondary monitor first-show bug)
             let position = match settings.overlay_position {
                 OverlayPosition::Top => "top",
                 OverlayPosition::Bottom | OverlayPosition::None => "bottom",
             };
-            let _ = overlay_window.emit("overlay-position", position);
-            // Emit event to trigger fade-in animation with recording state
-            let _ = overlay_window.emit("show-overlay", "recording");
+            let overlay_clone = overlay_window.clone();
+            let pos = position.to_string();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = overlay_clone.emit("overlay-position", &pos);
+                let _ = overlay_clone.emit("show-overlay", "recording");
+            });
         }
     });
 }
@@ -268,20 +269,24 @@ pub fn show_transcribing_overlay(app_handle: &AppHandle) {
         update_overlay_position(&app_handle);
 
         if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-            let _ = overlay_window.show();
             // On Wayland, bring window to front via GTK APIs
             #[cfg(target_os = "linux")]
             if crate::wayland::is_wayland() {
                 crate::wayland::present_gnome_overlay(&overlay_window);
             }
-            // Emit position preference to frontend for CSS positioning
+            // Delay emit so the OS window manager finishes repositioning
+            // before the frontend animates (fixes secondary monitor first-show bug)
             let position = match settings.overlay_position {
                 OverlayPosition::Top => "top",
                 OverlayPosition::Bottom | OverlayPosition::None => "bottom",
             };
-            let _ = overlay_window.emit("overlay-position", position);
-            // Emit event to switch to transcribing state
-            let _ = overlay_window.emit("show-overlay", "transcribing");
+            let overlay_clone = overlay_window.clone();
+            let pos = position.to_string();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = overlay_clone.emit("overlay-position", &pos);
+                let _ = overlay_clone.emit("show-overlay", "transcribing");
+            });
         }
     });
 }
@@ -297,7 +302,6 @@ pub fn show_warning_overlay(app_handle: &AppHandle, message: &str) {
     update_overlay_position(app_handle);
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        let _ = overlay_window.show();
         // On Wayland, bring window to front via GTK APIs
         #[cfg(target_os = "linux")]
         if crate::wayland::is_wayland() {
@@ -323,8 +327,6 @@ pub fn show_warning_overlay(app_handle: &AppHandle, message: &str) {
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(2));
             let _ = window_clone.emit("hide-overlay", ());
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            let _ = window_clone.hide();
         });
     }
 }
@@ -346,14 +348,8 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        // Emit event to trigger fade-out animation
+        // Emit event to trigger fade-out animation (window stays visible for CSS/Framer Motion transitions)
         let _ = overlay_window.emit("hide-overlay", ());
-        // Hide the window after a short delay to allow animation to complete
-        let window_clone = overlay_window.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(300));
-            let _ = window_clone.hide();
-        });
     }
 }
 

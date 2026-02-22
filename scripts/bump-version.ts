@@ -121,6 +121,14 @@ function main(): void {
     stdio: "inherit",
   });
   console.log("✓ Cargo.lock updated");
+
+  // Run ultracite fix to format updated files
+  console.log("\n⏳ Running ultracite fix...");
+  execSync("bunx ultracite fix", {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
+  console.log("✓ Formatting applied");
 }
 
 main();

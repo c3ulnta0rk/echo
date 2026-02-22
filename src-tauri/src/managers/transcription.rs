@@ -49,6 +49,9 @@ pub struct TranscriptionManager {
     /// Adaptive max samples for streaming - dynamically adjusted based on transcription performance
     /// Starts at None (no limit), then caps when transcription exceeds 800ms
     adaptive_max_samples: Arc<Mutex<Option<usize>>>,
+    /// Generation counter for the current streaming session, used to discard
+    /// stale streaming chunks that belong to a previous recording.
+    active_generation: Arc<AtomicU64>,
 }
 
 impl TranscriptionManager {
@@ -72,6 +75,7 @@ impl TranscriptionManager {
             last_partial_update: Arc::new(Mutex::new(std::time::Instant::now())),
             streaming_in_progress: Arc::new(AtomicBool::new(false)),
             adaptive_max_samples: Arc::new(Mutex::new(None)),
+            active_generation: Arc::new(AtomicU64::new(0)),
         };
 
         // Start the idle watcher
@@ -428,8 +432,9 @@ impl TranscriptionManager {
 
         Ok(corrected_result.trim().to_string())
     }
-    pub fn start_streaming(&self) {
+    pub fn start_streaming(&self, generation: u64) {
         debug!("start_streaming called - clearing buffer and resetting adaptive limit");
+        self.active_generation.store(generation, Ordering::SeqCst);
         let mut buf = self.streaming_buffer.lock().unwrap();
         buf.clear();
         *self.last_partial_update.lock().unwrap() = std::time::Instant::now();
@@ -437,7 +442,12 @@ impl TranscriptionManager {
         *self.adaptive_max_samples.lock().unwrap() = None;
     }
 
-    pub fn handle_streaming_chunk(&self, chunk: Vec<f32>) {
+    pub fn handle_streaming_chunk(&self, chunk: Vec<f32>, generation: u64) {
+        // Discard chunk if it belongs to a stale recording session
+        if self.active_generation.load(Ordering::SeqCst) != generation {
+            return;
+        }
+
         // Append chunk to buffer
         let current_len = {
             let mut buf = self.streaming_buffer.lock().unwrap();
@@ -496,6 +506,12 @@ impl TranscriptionManager {
             let this = self.clone();
 
             thread::spawn(move || {
+                // Check generation before starting transcription work
+                if this.active_generation.load(Ordering::SeqCst) != generation {
+                    this.streaming_in_progress.store(false, Ordering::SeqCst);
+                    return;
+                }
+
                 let transcription_start = std::time::Instant::now();
                 if let Ok(text) = this.transcribe(buf_to_transcribe) {
                     let transcription_ms = transcription_start.elapsed().as_millis();
@@ -540,8 +556,10 @@ impl TranscriptionManager {
                         }
                     }
 
-                    // Emit to recording overlay window (just the current window text)
-                    crate::overlay::emit_transcription_progress(&this.app_handle, &text);
+                    // Only emit if this generation is still current
+                    if this.active_generation.load(Ordering::SeqCst) == generation {
+                        crate::overlay::emit_transcription_progress(&this.app_handle, &text);
+                    }
                 }
                 // Mark streaming transcription as complete
                 this.streaming_in_progress.store(false, Ordering::SeqCst);

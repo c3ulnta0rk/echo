@@ -1,91 +1,110 @@
-/* Waveform container positioning based on overlay_position setting */
+/* ── Notch overlay animations ─────────────────────────────────────── */
 
-/* Top position: closer to top edge (macOS accounts for menu bar) */
-.overlay-waveform-top {
-  top: 46px; /* Account for macOS menu bar */
+@keyframes notch-slide-in {
+  from {
+    scale: 0.6 0.8;
+    opacity: 0;
+    filter: blur(8px);
+  }
+  to {
+    scale: 1 1;
+    opacity: 1;
+    filter: blur(0px);
+  }
 }
 
-/* Bottom position setting: slightly lower from top */
-.overlay-waveform-bottom {
-  top: 32px;
+@keyframes notch-slide-out {
+  from {
+    scale: 1 1;
+    opacity: 1;
+    filter: blur(0px);
+  }
+  to {
+    scale: 0.6 0.8;
+    opacity: 0;
+    filter: blur(8px);
+  }
 }
 
-/* Platform-specific adjustments via media queries or JS would go here if needed */
-
-/* Legacy styles for backwards compatibility */
-
-.overlay-left {
-  display: flex;
-  align-items: center;
+.notch-show {
+  animation: notch-slide-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.overlay-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.notch-hide {
+  animation: notch-slide-out 300ms cubic-bezier(0.5, 0, 0.75, 0) both;
 }
 
-.bars-container {
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  gap: 3px;
-  padding-bottom: 0px;
-  height: 24px;
-  overflow: hidden;
-}
+/* ── Notch transcribing state animations ─────────────────────────── */
 
-.bar {
-  width: 6px;
-  background: #ffe5ee;
-  max-height: 20px;
-  border-radius: 2px;
-  transition: height 80ms linear;
-  min-height: 4px;
-}
-
-.transcribing-text {
-  color: white;
-  font-size: 12px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  animation: transcribing-pulse 1.5s infinite ease-in-out;
-}
-
-@keyframes transcribing-pulse {
+@keyframes notch-breathing {
   0%,
   100% {
+    background-color: #000;
+  }
+  50% {
+    background-color: #141414;
+  }
+}
+
+.notch-breathing {
+  animation: notch-breathing 2s ease-in-out infinite;
+}
+
+@keyframes notch-progress-sweep {
+  0% {
+    translate: -100% 0;
+  }
+  50% {
+    translate: 100% 0;
+  }
+  100% {
+    translate: -100% 0;
+  }
+}
+
+.notch-progress-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  overflow: hidden;
+  border-radius: 0 0 24px 24px;
+}
+
+.notch-progress-line::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%
+  );
+  animation: notch-progress-sweep 2.4s ease-in-out infinite;
+}
+
+/* ── Bar processing pulse (staggered via animation-delay) ────────── */
+
+@keyframes notch-bar-pulse {
+  0%,
+  100% {
+    height: 20%;
+    opacity: 0.3;
+  }
+  50% {
+    height: 55%;
     opacity: 0.6;
   }
-
-  50% {
-    opacity: 1;
-  }
 }
 
-.cancel-button {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 150ms ease-out,
-    transform 100ms ease-out;
-  flex-shrink: 0;
+.notch-bar-pulse {
+  animation: notch-bar-pulse 1.2s ease-in-out infinite;
 }
 
-.cancel-button:hover {
-  background: #faa2ca33;
-  transform: scale(1.05);
-}
-
-.cancel-button:active {
-  transform: scale(0.95);
-}
+/* ── Utility styles ──────────────────────────────────────────────── */
 
 /* Hide scrollbar for streaming text */
 .scrollbar-hide {
