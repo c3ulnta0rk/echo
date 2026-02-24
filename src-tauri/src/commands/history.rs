@@ -160,21 +160,25 @@ pub async fn reprocess_history_entry(
     let mut post_process_prompt: Option<String> = None;
 
     // Try post-processing
-    if let Some(processed_text) =
-        crate::actions::maybe_post_process_transcription(&settings, transcription).await
-    {
-        final_text = processed_text.clone();
-        post_processed_text = Some(processed_text);
+    match crate::actions::maybe_post_process_transcription(&app, &settings, transcription).await {
+        crate::tools::PostProcessOutcome::Text(processed_text) => {
+            final_text = processed_text.clone();
+            post_processed_text = Some(processed_text);
 
-        // Get the prompt that was used
-        if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
-            if let Some(prompt) = settings
-                .post_process_prompts
-                .iter()
-                .find(|p| &p.id == prompt_id)
-            {
-                post_process_prompt = Some(prompt.prompt.clone());
+            // Get the prompt that was used
+            if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
+                if let Some(prompt) = settings
+                    .post_process_prompts
+                    .iter()
+                    .find(|p| &p.id == prompt_id)
+                {
+                    post_process_prompt = Some(prompt.prompt.clone());
+                }
             }
+        }
+        crate::tools::PostProcessOutcome::ToolExecuted(_) | crate::tools::PostProcessOutcome::Empty => {
+            // For reprocessing from history, tool executions are ignored —
+            // we only care about text corrections.
         }
     }
 

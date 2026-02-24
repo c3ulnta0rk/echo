@@ -131,6 +131,8 @@ const settingUpdaters: {
     invoke("change_tts_enabled_setting", { enabled: value }),
   post_process_enabled: (value) =>
     invoke("change_post_process_enabled_setting", { enabled: value }),
+  voice_commands_enabled: (value) =>
+    invoke("change_voice_commands_enabled_setting", { enabled: value }),
 };
 
 interface SettingsStore {
@@ -141,6 +143,7 @@ interface SettingsStore {
   outputDevices: AudioDevice[];
   customSounds: { start: boolean; stop: boolean };
   postProcessModelOptions: Record<string, string[]>;
+  modelToolSupport: Record<string, boolean | null>;
 
   initialize: () => Promise<void>;
   refreshSettings: () => Promise<void>;
@@ -165,6 +168,10 @@ interface SettingsStore {
     apiKey: string
   ) => Promise<void>;
   fetchPostProcessModels: (providerId: string) => Promise<string[]>;
+  checkModelToolSupport: (
+    providerId: string,
+    model: string
+  ) => Promise<boolean | null>;
   playTestSound: (soundType: "start" | "stop") => Promise<void>;
 }
 
@@ -176,6 +183,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   outputDevices: [],
   customSounds: { start: false, stop: false },
   postProcessModelOptions: {},
+  modelToolSupport: {},
 
   refreshSettings: async () => {
     try {
@@ -504,6 +512,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       return [];
     } finally {
       set((state) => ({ isUpdating: omitKey(state.isUpdating, updateKey) }));
+    }
+  },
+
+  checkModelToolSupport: async (providerId, model) => {
+    if (!model.trim()) {
+      return null;
+    }
+    const cacheKey = `${providerId}:${model}`;
+    try {
+      const result: boolean | null = await invoke("check_model_tool_support", {
+        providerId,
+        model,
+      });
+      set((state) => ({
+        modelToolSupport: { ...state.modelToolSupport, [cacheKey]: result },
+      }));
+      return result;
+    } catch {
+      return null;
     }
   },
 

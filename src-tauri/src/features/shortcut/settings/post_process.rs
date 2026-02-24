@@ -305,6 +305,82 @@ async fn fetch_models_manual(
     Ok(models)
 }
 
+/// Check whether a model supports tool calling for the given provider.
+///
+/// Returns `Some(true)` when tools are supported, `Some(false)` when they are
+/// not, and `None` when support cannot be determined (e.g. custom providers).
+#[tauri::command]
+pub async fn check_model_tool_support(
+    app: AppHandle,
+    provider_id: String,
+    model: String,
+) -> Result<Option<bool>, String> {
+    // Known cloud providers always support tool calling
+    if ["openai", "anthropic", "openrouter"].contains(&provider_id.as_str()) {
+        return Ok(Some(true));
+    }
+
+    // For Ollama, query the `/api/show` endpoint for capabilities
+    if provider_id == "ollama" {
+        let settings = settings::get_settings(&app);
+        let provider = settings
+            .post_process_providers
+            .iter()
+            .find(|p| p.id == provider_id)
+            .ok_or_else(|| format!("Provider '{}' not found", provider_id))?
+            .clone();
+
+        return check_ollama_tool_support(&provider, &model).await;
+    }
+
+    // Custom / unknown providers – we can't determine support
+    Ok(None)
+}
+
+/// Query Ollama's `/api/show` endpoint and check the `capabilities` array.
+async fn check_ollama_tool_support(
+    provider: &crate::settings::PostProcessProvider,
+    model: &str,
+) -> Result<Option<bool>, String> {
+    let base = provider
+        .base_url
+        .trim_end_matches('/')
+        .trim_end_matches("/v1");
+    let endpoint = format!("{}/api/show", base);
+
+    let body = serde_json::json!({ "model": model });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&endpoint)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to query Ollama model info: {}", e))?;
+
+    if !response.status().is_success() {
+        // If the endpoint is unavailable (old Ollama, model not found, etc.)
+        // fall back to "unknown" rather than erroring out.
+        return Ok(None);
+    }
+
+    let parsed: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Ollama model info: {}", e))?;
+
+    // Recent Ollama versions expose a `capabilities` array, e.g. ["completion", "tools"]
+    if let Some(capabilities) = parsed.get("capabilities").and_then(|c| c.as_array()) {
+        let supports_tools = capabilities
+            .iter()
+            .any(|cap| cap.as_str() == Some("tools"));
+        return Ok(Some(supports_tools));
+    }
+
+    // Older Ollama versions don't expose capabilities – unknown
+    Ok(None)
+}
+
 /// Set the selected post-process prompt.
 #[tauri::command]
 pub fn set_post_process_selected_prompt(app: AppHandle, id: Option<String>) -> Result<(), String> {
@@ -318,6 +394,15 @@ pub fn set_post_process_selected_prompt(app: AppHandle, id: Option<String>) -> R
         s.post_process_selected_prompt_id = id.clone();
         Ok(())
     })
+}
+
+/// Change voice commands (tool calling) enabled setting.
+#[tauri::command]
+pub fn change_voice_commands_enabled_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    settings::update_settings(&app, |s| {
+        s.voice_commands_enabled = enabled;
+    });
+    Ok(())
 }
 
 /// Change post-process enabled setting.

@@ -5,14 +5,14 @@ import "./recording-overlay.css";
 import EchoLogo from "@/components/icons/echo-logo";
 import { cn } from "@/lib/utils";
 
-type OverlayState = "recording" | "transcribing" | "warning";
+type OverlayState = "recording" | "transcribing" | "warning" | "tool";
 
 interface WarningPayload {
-  state: "warning";
+  state: "warning" | "tool";
   message: string;
 }
 
-const NOTCH_HEIGHT = 37;
+const NOTCH_HEIGHT = 42;
 const NOTCH_WIDTH = 310;
 const EXPANDED_HEIGHT = 76;
 const TOP_OVERFLOW = 100;
@@ -64,7 +64,8 @@ const RecordingOverlay = () => {
   const barsRef = useRef<HTMLDivElement>(null);
   const hasBeenShown = useRef(false);
 
-  const hasText = Boolean(streamingText) || state === "warning";
+  const hasText =
+    Boolean(streamingText) || state === "warning" || state === "tool";
 
   // Store unlisten fns in a ref so the synchronous cleanup can call them
   const unlistenRef = useRef<UnlistenFn[]>([]);
@@ -86,9 +87,10 @@ const RecordingOverlay = () => {
           } else if (
             typeof event.payload === "object" &&
             event.payload !== null &&
-            event.payload.state === "warning"
+            (event.payload.state === "warning" ||
+              event.payload.state === "tool")
           ) {
-            setState("warning");
+            setState(event.payload.state);
             setWarningMessage(event.payload.message || "Please wait...");
           }
           hasBeenShown.current = true;
@@ -230,7 +232,7 @@ const RecordingOverlay = () => {
         <div className="flex shrink-0 items-center justify-between px-5 pt-2">
           <EchoLogo className="h-4 w-4 text-white/70" variant="sm" />
           <div
-            className="flex h-5 w-5 items-center justify-center gap-[2px]"
+            className="flex h-5 w-5 items-center justify-center gap-0.5"
             ref={barsRef}
           >
             {BAR_DELAYS.map((delay) => (
@@ -262,7 +264,9 @@ const RecordingOverlay = () => {
               "-webkit-linear-gradient(left, transparent, black 12px, black calc(100% - 12px), transparent)",
           }}
         >
-          {state === "warning" ? warningMessage : streamingText}
+          {state === "warning" || state === "tool"
+            ? warningMessage
+            : streamingText}
         </div>
 
         {/* Progress sweep line during transcription */}

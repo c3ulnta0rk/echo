@@ -133,6 +133,7 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         .accept_first_mouse(true)
         .decorations(false)
         .always_on_top(true)
+        .visible_on_all_workspaces(true)
         .skip_taskbar(true)
         .transparent(true)
         .focused(false)
@@ -326,6 +327,42 @@ pub fn show_warning_overlay(app_handle: &AppHandle, message: &str) {
         let window_clone = overlay_window.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(2));
+            let _ = window_clone.emit("hide-overlay", ());
+        });
+    }
+}
+
+/// Shows a tool result overlay with a custom message (auto-hides after 3 seconds)
+pub fn show_tool_overlay(app_handle: &AppHandle, message: &str) {
+    let settings = settings::get_settings(app_handle);
+    if settings.overlay_position == OverlayPosition::None {
+        return;
+    }
+
+    update_overlay_position(app_handle);
+
+    if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+        #[cfg(target_os = "linux")]
+        if crate::wayland::is_wayland() {
+            crate::wayland::present_gnome_overlay(&overlay_window);
+        }
+        let position = match settings.overlay_position {
+            OverlayPosition::Top => "top",
+            OverlayPosition::Bottom | OverlayPosition::None => "bottom",
+        };
+        let _ = overlay_window.emit("overlay-position", position);
+        let _ = overlay_window.emit(
+            "show-overlay",
+            serde_json::json!({
+                "state": "tool",
+                "message": message
+            }),
+        );
+
+        // Auto-hide after 3 seconds (longer than warning for readability)
+        let window_clone = overlay_window.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(3));
             let _ = window_clone.emit("hide-overlay", ());
         });
     }

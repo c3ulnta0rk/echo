@@ -8,6 +8,7 @@ mod helpers;
 mod llm_client;
 mod logging;
 mod managers;
+mod tools;
 mod overlay;
 mod settings;
 #[cfg(unix)]
@@ -632,6 +633,8 @@ pub fn run() {
             shortcut::settings::post_process::update_post_process_prompt,
             shortcut::settings::post_process::delete_post_process_prompt,
             shortcut::settings::post_process::set_post_process_selected_prompt,
+            shortcut::settings::post_process::check_model_tool_support,
+            shortcut::settings::post_process::change_voice_commands_enabled_setting,
             // Input tracking settings commands
             shortcut::settings::input_tracking::change_input_tracking_setting,
             shortcut::settings::input_tracking::change_input_tracking_excluded_apps,

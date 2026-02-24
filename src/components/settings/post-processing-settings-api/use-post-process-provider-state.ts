@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { PostProcessProvider } from "@/lib/types";
 import { useSetting, useSettingsStore } from "@/stores/settings-store";
 import { getDefaultBaseUrl } from "./default-providers";
@@ -8,6 +8,9 @@ interface DropdownOption {
   value: string;
   label: string;
 }
+
+/** `true` = supports tools, `false` = does not, `null` = unknown / checking */
+export type ToolSupportStatus = boolean | null;
 
 interface PostProcessProviderState {
   enabled: boolean;
@@ -35,6 +38,7 @@ interface PostProcessProviderState {
   handleModelSelect: (value: string) => void;
   handleModelCreate: (value: string) => void;
   handleRefreshModels: () => void;
+  toolSupport: ToolSupportStatus;
 }
 
 export const usePostProcessProviderState = (): PostProcessProviderState => {
@@ -49,6 +53,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     (s) => s.postProcessModelOptions
   );
   const isUpdatingMap = useSettingsStore((s) => s.isUpdating);
+  const modelToolSupport = useSettingsStore((s) => s.modelToolSupport);
 
   // Actions (stable references)
   const setPostProcessProvider = useSettingsStore(
@@ -62,6 +67,9 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   );
   const fetchPostProcessModels = useSettingsStore(
     (s) => s.fetchPostProcessModels
+  );
+  const checkModelToolSupportAction = useSettingsStore(
+    (s) => s.checkModelToolSupport
   );
 
   // Settings are guaranteed to have providers after migration
@@ -181,9 +189,19 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   const isOllamaProvider = selectedProvider?.id === "ollama";
   const isLocalProvider = isCustomProvider || isOllamaProvider;
 
-  // Auto-fetch models when provider changes
-  // Note: useSettings hook should handle this, but we trigger it here for provider changes
-  // The fetchPostProcessModels will handle API key validation internally
+  // Check tool support when provider or model changes
+  useEffect(() => {
+    if (selectedProviderId && model.trim()) {
+      checkModelToolSupportAction(selectedProviderId, model);
+    }
+  }, [selectedProviderId, model, checkModelToolSupportAction]);
+
+  // Read cached tool support status
+  const cacheKey = `${selectedProviderId}:${model}`;
+  const toolSupport: ToolSupportStatus =
+    model.trim() && cacheKey in modelToolSupport
+      ? (modelToolSupport[cacheKey] ?? null)
+      : null;
 
   return {
     enabled: true,
@@ -211,5 +229,6 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     handleModelSelect,
     handleModelCreate,
     handleRefreshModels,
+    toolSupport,
   };
 };

@@ -234,6 +234,8 @@ pub struct AppSettings {
     pub post_process_prompts: Vec<LLMPrompt>,
     #[serde(default)]
     pub post_process_selected_prompt_id: Option<String>,
+    #[serde(default = "default_voice_commands_enabled")]
+    pub voice_commands_enabled: bool,
     #[serde(default)]
     pub mute_while_recording: bool,
     #[serde(default)]
@@ -304,6 +306,10 @@ fn default_recording_retention_period() -> RecordingRetentionPeriod {
 
 fn default_input_tracking_idle_timeout() -> Option<u64> {
     Some(2) // Default 2 seconds
+}
+
+fn default_voice_commands_enabled() -> bool {
+    true
 }
 
 fn default_post_process_provider_id() -> String {
@@ -464,6 +470,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
         post_process_selected_prompt_id: None,
+        voice_commands_enabled: default_voice_commands_enabled(),
         mute_while_recording: false,
         input_tracking_enabled: false,
         input_tracking_excluded_apps: Vec::new(),

@@ -1,11 +1,11 @@
 [package]
-name = "echo"
-version = "0.2.7"
+name = "echo-app"
+version = "0.3.0"
 description = "Echo"
 authors = ["Damien Schneider <damien-schneider>"]
 edition = "2021"
 license = "MIT"
-default-run = "echo"
+default-run = "echo-app"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.
