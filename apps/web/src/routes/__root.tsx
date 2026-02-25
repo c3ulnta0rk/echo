@@ -7,8 +7,8 @@ import SmoothScroll from "../components/smooth-scroll";
 
 import appCss from "../styles.css?url";
 
-// Set VITE_SITE_URL in your .env file for canonical URLs and og:url (e.g. https://getecho.app)
-const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? "";
+const SITE_URL: string =
+  import.meta.env.VITE_SITE_URL ?? "https://echo-app.site";
 
 const schemaOrg = JSON.stringify({
   "@context": "https://schema.org",
@@ -16,6 +16,7 @@ const schemaOrg = JSON.stringify({
     {
       "@type": "SoftwareApplication",
       name: "Echo",
+      url: SITE_URL,
       applicationCategory: "UtilitiesApplication",
       operatingSystem: ["macOS", "Windows", "Linux"],
       offers: {
@@ -48,8 +49,9 @@ const schemaOrg = JSON.stringify({
     {
       "@type": "Organization",
       name: "Echo",
-      logo: "/logo192.png",
-      sameAs: ["https://github.com/damien-schneider/Echo"],
+      url: SITE_URL,
+      logo: `${SITE_URL}/logo192.png`,
+      sameAs: ["https://github.com/damien-schneider/Echo", SITE_URL],
     },
   ],
 });
