@@ -4,6 +4,17 @@ import { H1, P } from "@/components/ui/typography";
 
 export const Route = createFileRoute("/license")({
   component: LicensePage,
+  head: () => ({
+    meta: [
+      { title: "MIT License — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "Echo is released under the MIT License — free to use, modify, and distribute.",
+      },
+      { name: "robots", content: "noindex, follow" },
+    ],
+  }),
 });
 
 function LicensePage() {

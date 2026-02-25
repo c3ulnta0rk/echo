@@ -71,6 +71,12 @@ export default function Navbar() {
           </Link>
           <Link
             className="font-medium text-sm transition-colors hover:text-primary"
+            to="/blog"
+          >
+            Blog
+          </Link>
+          <Link
+            className="font-medium text-sm transition-colors hover:text-primary"
             to="/faq"
           >
             FAQ
@@ -159,6 +165,13 @@ export default function Navbar() {
               to="/"
             >
               Features
+            </Link>
+            <Link
+              className="font-medium text-sm"
+              onClick={() => setIsMenuOpen(false)}
+              to="/blog"
+            >
+              Blog
             </Link>
             <Link
               className="font-medium text-sm"

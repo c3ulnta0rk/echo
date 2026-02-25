@@ -1,4 +1,31 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "extends": ["ultracite/core", "ultracite/react"]
+  "extends": ["ultracite/core", "ultracite/react"],
+  "overrides": [
+    {
+      // Allow dangerouslySetInnerHTML in specific files for JSON-LD structured data injection
+      "includes": [
+        "apps/web/src/routes/__root.tsx",
+        "apps/web/src/components/landing/faq.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          }
+        }
+      }
+    },
+    {
+      // TanStack Router uses bracket notation in filenames (e.g. sitemap[.]xml.ts) — not kebab-case
+      "includes": ["apps/web/src/routes/**/*\\[*\\]*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          }
+        }
+      }
+    }
+  ]
 }

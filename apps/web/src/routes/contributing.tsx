@@ -6,6 +6,25 @@ import { H1, H2, InlineCode, List, P } from "@/components/ui/typography";
 
 export const Route = createFileRoute("/contributing")({
   component: ContributingPage,
+  head: () => ({
+    meta: [
+      { title: "Contributing — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "Help build Echo, the open-source offline speech-to-text app. Learn how to contribute code, report bugs, and improve the project.",
+      },
+      {
+        property: "og:title",
+        content: "Contributing — Echo Speech-to-Text",
+      },
+      {
+        property: "og:description",
+        content:
+          "Help build Echo, the open-source offline speech-to-text app. Learn how to contribute code, report bugs, and improve the project.",
+      },
+    ],
+  }),
 });
 
 function ContributingPage() {

@@ -38,17 +38,27 @@ export function Footer({
     <footer className="border-t bg-background pt-16 pb-6 text-foreground lg:pt-24 lg:pb-8">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="md:flex md:items-start md:justify-between">
-          <a
-            aria-label={brandName}
-            className="flex items-center gap-x-2"
-            href="/"
+          <div className="flex flex-col gap-3">
+            <a
+              aria-label={`${brandName} — home`}
+              className="flex items-center gap-x-2"
+              href="/"
+            >
+              {logo}
+              {showBrandName && (
+                <span className="font-bold text-xl">{brandName}</span>
+              )}
+            </a>
+            <p className="max-w-xs text-muted-foreground text-xs leading-relaxed">
+              Free, open-source, offline speech-to-text for macOS, Windows, and
+              Linux. Powered by Whisper AI — your voice never leaves your
+              device.
+            </p>
+          </div>
+          <ul
+            aria-label="Social links"
+            className="mt-6 flex list-none space-x-3 md:mt-0"
           >
-            {logo}
-            {showBrandName && (
-              <span className="font-bold text-xl">{brandName}</span>
-            )}
-          </a>
-          <ul className="mt-6 flex list-none space-x-3 md:mt-0">
             {socialLinks.map((link) => (
               <li key={link.label}>
                 <Button
@@ -57,7 +67,12 @@ export function Footer({
                   size="icon"
                   variant="secondary"
                 >
-                  <a aria-label={link.label} href={link.href} target="_blank">
+                  <a
+                    aria-label={link.label}
+                    href={link.href}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
                     {link.icon}
                   </a>
                 </Button>
@@ -66,7 +81,7 @@ export function Footer({
           </ul>
         </div>
         <div className="mt-6 border-t pt-6 md:mt-4 md:pt-8 lg:grid lg:grid-cols-10">
-          <nav className="lg:col-[4/11] lg:mt-0">
+          <nav aria-label="Site navigation" className="lg:col-[4/11] lg:mt-0">
             <ul className="-mx-2 -my-1 flex list-none flex-wrap lg:justify-end">
               {mainLinks.map((link) => (
                 <li className="mx-2 my-1 shrink-0" key={link.href}>
@@ -80,7 +95,7 @@ export function Footer({
               ))}
             </ul>
           </nav>
-          <div className="mt-6 lg:col-[4/11] lg:mt-0">
+          <nav aria-label="Legal" className="mt-6 lg:col-[4/11] lg:mt-0">
             <ul className="-mx-3 -my-1 flex list-none flex-wrap lg:justify-end">
               {legalLinks.map((link) => (
                 <li className="mx-3 my-1 shrink-0" key={link.href}>
@@ -93,7 +108,7 @@ export function Footer({
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
           <div className="mt-6 whitespace-nowrap text-muted-foreground text-sm leading-6 lg:col-[1/4] lg:row-[1/3] lg:mt-0">
             <div>{copyright.text}</div>
             {copyright.license && <div>{copyright.license}</div>}
@@ -119,13 +134,15 @@ export default function EchoFooter() {
       ]}
       logo={<EchoLogo className="h-8 w-auto text-foreground" variant="full" />}
       mainLinks={[
+        { href: "/blog", label: "Blog" },
+        { href: "/vs", label: "Compare" },
         { href: "/faq", label: "FAQ" },
         { href: "/roadmap", label: "Roadmap" },
         { href: "/contributing", label: "Contributing" },
-        { href: "#download", label: "Download" },
+        { href: "/#download", label: "Download" },
         {
           href: "https://github.com/damien-schneider/Echo",
-          label: "Documentation",
+          label: "GitHub",
         },
       ]}
       showBrandName={false}

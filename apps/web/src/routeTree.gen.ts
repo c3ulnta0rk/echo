@@ -10,12 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LicenseRouteImport } from './routes/license'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ContributingRouteImport } from './routes/contributing'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VsIndexRouteImport } from './routes/vs/index'
+import { Route as BlogIndexRouteImport } from './routes/blog/index'
+import { Route as VsWisprFlowRouteImport } from './routes/vs/wispr-flow'
+import { Route as VsWhisperDesktopRouteImport } from './routes/vs/whisper-desktop'
+import { Route as VsVoiceinkRouteImport } from './routes/vs/voiceink'
+import { Route as VsSuperWhisperRouteImport } from './routes/vs/super-whisper'
+import { Route as VsOtterAiRouteImport } from './routes/vs/otter-ai'
+import { Route as VsMacwhisperRouteImport } from './routes/vs/macwhisper'
+import { Route as VsHandyRouteImport } from './routes/vs/handy'
+import { Route as VsDragonRouteImport } from './routes/vs/dragon'
+import { Route as VsBuzzRouteImport } from './routes/vs/buzz'
+import { Route as VsAppleDictationRouteImport } from './routes/vs/apple-dictation'
+import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
 import { Route as DemoApiNamesRouteImport } from './routes/demo/api.names'
@@ -27,6 +41,11 @@ import { Route as DemoStartSsrDataOnlyRouteImport } from './routes/demo/start.ss
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoadmapRoute = RoadmapRouteImport.update({
@@ -57,6 +76,71 @@ const ContributingRoute = ContributingRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsIndexRoute = VsIndexRouteImport.update({
+  id: '/vs/',
+  path: '/vs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsWisprFlowRoute = VsWisprFlowRouteImport.update({
+  id: '/vs/wispr-flow',
+  path: '/vs/wispr-flow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsWhisperDesktopRoute = VsWhisperDesktopRouteImport.update({
+  id: '/vs/whisper-desktop',
+  path: '/vs/whisper-desktop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsVoiceinkRoute = VsVoiceinkRouteImport.update({
+  id: '/vs/voiceink',
+  path: '/vs/voiceink',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsSuperWhisperRoute = VsSuperWhisperRouteImport.update({
+  id: '/vs/super-whisper',
+  path: '/vs/super-whisper',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsOtterAiRoute = VsOtterAiRouteImport.update({
+  id: '/vs/otter-ai',
+  path: '/vs/otter-ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsMacwhisperRoute = VsMacwhisperRouteImport.update({
+  id: '/vs/macwhisper',
+  path: '/vs/macwhisper',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsHandyRoute = VsHandyRouteImport.update({
+  id: '/vs/handy',
+  path: '/vs/handy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsDragonRoute = VsDragonRouteImport.update({
+  id: '/vs/dragon',
+  path: '/vs/dragon',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsBuzzRoute = VsBuzzRouteImport.update({
+  id: '/vs/buzz',
+  path: '/vs/buzz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VsAppleDictationRoute = VsAppleDictationRouteImport.update({
+  id: '/vs/apple-dictation',
+  path: '/vs/apple-dictation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoStartServerFuncsRoute = DemoStartServerFuncsRouteImport.update({
@@ -102,7 +186,21 @@ export interface FileRoutesByFullPath {
   '/license': typeof LicenseRoute
   '/privacy': typeof PrivacyRoute
   '/roadmap': typeof RoadmapRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/vs/apple-dictation': typeof VsAppleDictationRoute
+  '/vs/buzz': typeof VsBuzzRoute
+  '/vs/dragon': typeof VsDragonRoute
+  '/vs/handy': typeof VsHandyRoute
+  '/vs/macwhisper': typeof VsMacwhisperRoute
+  '/vs/otter-ai': typeof VsOtterAiRoute
+  '/vs/super-whisper': typeof VsSuperWhisperRoute
+  '/vs/voiceink': typeof VsVoiceinkRoute
+  '/vs/whisper-desktop': typeof VsWhisperDesktopRoute
+  '/vs/wispr-flow': typeof VsWisprFlowRoute
+  '/blog/': typeof BlogIndexRoute
+  '/vs/': typeof VsIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -118,7 +216,21 @@ export interface FileRoutesByTo {
   '/license': typeof LicenseRoute
   '/privacy': typeof PrivacyRoute
   '/roadmap': typeof RoadmapRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/vs/apple-dictation': typeof VsAppleDictationRoute
+  '/vs/buzz': typeof VsBuzzRoute
+  '/vs/dragon': typeof VsDragonRoute
+  '/vs/handy': typeof VsHandyRoute
+  '/vs/macwhisper': typeof VsMacwhisperRoute
+  '/vs/otter-ai': typeof VsOtterAiRoute
+  '/vs/super-whisper': typeof VsSuperWhisperRoute
+  '/vs/voiceink': typeof VsVoiceinkRoute
+  '/vs/whisper-desktop': typeof VsWhisperDesktopRoute
+  '/vs/wispr-flow': typeof VsWisprFlowRoute
+  '/blog': typeof BlogIndexRoute
+  '/vs': typeof VsIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -135,7 +247,21 @@ export interface FileRoutesById {
   '/license': typeof LicenseRoute
   '/privacy': typeof PrivacyRoute
   '/roadmap': typeof RoadmapRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/vs/apple-dictation': typeof VsAppleDictationRoute
+  '/vs/buzz': typeof VsBuzzRoute
+  '/vs/dragon': typeof VsDragonRoute
+  '/vs/handy': typeof VsHandyRoute
+  '/vs/macwhisper': typeof VsMacwhisperRoute
+  '/vs/otter-ai': typeof VsOtterAiRoute
+  '/vs/super-whisper': typeof VsSuperWhisperRoute
+  '/vs/voiceink': typeof VsVoiceinkRoute
+  '/vs/whisper-desktop': typeof VsWhisperDesktopRoute
+  '/vs/wispr-flow': typeof VsWisprFlowRoute
+  '/blog/': typeof BlogIndexRoute
+  '/vs/': typeof VsIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
@@ -153,7 +279,21 @@ export interface FileRouteTypes {
     | '/license'
     | '/privacy'
     | '/roadmap'
+    | '/sitemap.xml'
     | '/terms'
+    | '/blog/$slug'
+    | '/vs/apple-dictation'
+    | '/vs/buzz'
+    | '/vs/dragon'
+    | '/vs/handy'
+    | '/vs/macwhisper'
+    | '/vs/otter-ai'
+    | '/vs/super-whisper'
+    | '/vs/voiceink'
+    | '/vs/whisper-desktop'
+    | '/vs/wispr-flow'
+    | '/blog/'
+    | '/vs/'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -169,7 +309,21 @@ export interface FileRouteTypes {
     | '/license'
     | '/privacy'
     | '/roadmap'
+    | '/sitemap.xml'
     | '/terms'
+    | '/blog/$slug'
+    | '/vs/apple-dictation'
+    | '/vs/buzz'
+    | '/vs/dragon'
+    | '/vs/handy'
+    | '/vs/macwhisper'
+    | '/vs/otter-ai'
+    | '/vs/super-whisper'
+    | '/vs/voiceink'
+    | '/vs/whisper-desktop'
+    | '/vs/wispr-flow'
+    | '/blog'
+    | '/vs'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -185,7 +339,21 @@ export interface FileRouteTypes {
     | '/license'
     | '/privacy'
     | '/roadmap'
+    | '/sitemap.xml'
     | '/terms'
+    | '/blog/$slug'
+    | '/vs/apple-dictation'
+    | '/vs/buzz'
+    | '/vs/dragon'
+    | '/vs/handy'
+    | '/vs/macwhisper'
+    | '/vs/otter-ai'
+    | '/vs/super-whisper'
+    | '/vs/voiceink'
+    | '/vs/whisper-desktop'
+    | '/vs/wispr-flow'
+    | '/blog/'
+    | '/vs/'
     | '/demo/api/names'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
@@ -202,7 +370,21 @@ export interface RootRouteChildren {
   LicenseRoute: typeof LicenseRoute
   PrivacyRoute: typeof PrivacyRoute
   RoadmapRoute: typeof RoadmapRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  BlogSlugRoute: typeof BlogSlugRoute
+  VsAppleDictationRoute: typeof VsAppleDictationRoute
+  VsBuzzRoute: typeof VsBuzzRoute
+  VsDragonRoute: typeof VsDragonRoute
+  VsHandyRoute: typeof VsHandyRoute
+  VsMacwhisperRoute: typeof VsMacwhisperRoute
+  VsOtterAiRoute: typeof VsOtterAiRoute
+  VsSuperWhisperRoute: typeof VsSuperWhisperRoute
+  VsVoiceinkRoute: typeof VsVoiceinkRoute
+  VsWhisperDesktopRoute: typeof VsWhisperDesktopRoute
+  VsWisprFlowRoute: typeof VsWisprFlowRoute
+  BlogIndexRoute: typeof BlogIndexRoute
+  VsIndexRoute: typeof VsIndexRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
@@ -219,6 +401,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roadmap': {
@@ -261,6 +450,97 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/': {
+      id: '/vs/'
+      path: '/vs'
+      fullPath: '/vs/'
+      preLoaderRoute: typeof VsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/': {
+      id: '/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/wispr-flow': {
+      id: '/vs/wispr-flow'
+      path: '/vs/wispr-flow'
+      fullPath: '/vs/wispr-flow'
+      preLoaderRoute: typeof VsWisprFlowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/whisper-desktop': {
+      id: '/vs/whisper-desktop'
+      path: '/vs/whisper-desktop'
+      fullPath: '/vs/whisper-desktop'
+      preLoaderRoute: typeof VsWhisperDesktopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/voiceink': {
+      id: '/vs/voiceink'
+      path: '/vs/voiceink'
+      fullPath: '/vs/voiceink'
+      preLoaderRoute: typeof VsVoiceinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/super-whisper': {
+      id: '/vs/super-whisper'
+      path: '/vs/super-whisper'
+      fullPath: '/vs/super-whisper'
+      preLoaderRoute: typeof VsSuperWhisperRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/otter-ai': {
+      id: '/vs/otter-ai'
+      path: '/vs/otter-ai'
+      fullPath: '/vs/otter-ai'
+      preLoaderRoute: typeof VsOtterAiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/macwhisper': {
+      id: '/vs/macwhisper'
+      path: '/vs/macwhisper'
+      fullPath: '/vs/macwhisper'
+      preLoaderRoute: typeof VsMacwhisperRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/handy': {
+      id: '/vs/handy'
+      path: '/vs/handy'
+      fullPath: '/vs/handy'
+      preLoaderRoute: typeof VsHandyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/dragon': {
+      id: '/vs/dragon'
+      path: '/vs/dragon'
+      fullPath: '/vs/dragon'
+      preLoaderRoute: typeof VsDragonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/buzz': {
+      id: '/vs/buzz'
+      path: '/vs/buzz'
+      fullPath: '/vs/buzz'
+      preLoaderRoute: typeof VsBuzzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vs/apple-dictation': {
+      id: '/vs/apple-dictation'
+      path: '/vs/apple-dictation'
+      fullPath: '/vs/apple-dictation'
+      preLoaderRoute: typeof VsAppleDictationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/start/server-funcs': {
@@ -322,7 +602,21 @@ const rootRouteChildren: RootRouteChildren = {
   LicenseRoute: LicenseRoute,
   PrivacyRoute: PrivacyRoute,
   RoadmapRoute: RoadmapRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  BlogSlugRoute: BlogSlugRoute,
+  VsAppleDictationRoute: VsAppleDictationRoute,
+  VsBuzzRoute: VsBuzzRoute,
+  VsDragonRoute: VsDragonRoute,
+  VsHandyRoute: VsHandyRoute,
+  VsMacwhisperRoute: VsMacwhisperRoute,
+  VsOtterAiRoute: VsOtterAiRoute,
+  VsSuperWhisperRoute: VsSuperWhisperRoute,
+  VsVoiceinkRoute: VsVoiceinkRoute,
+  VsWhisperDesktopRoute: VsWhisperDesktopRoute,
+  VsWisprFlowRoute: VsWisprFlowRoute,
+  BlogIndexRoute: BlogIndexRoute,
+  VsIndexRoute: VsIndexRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,

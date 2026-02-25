@@ -4,6 +4,17 @@ import { H1, H2, P } from "@/components/ui/typography";
 
 export const Route = createFileRoute("/terms")({
   component: TermsPage,
+  head: () => ({
+    meta: [
+      { title: "Terms of Service — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "Terms of service for Echo, the free open-source offline speech-to-text application.",
+      },
+      { name: "robots", content: "noindex, follow" },
+    ],
+  }),
 });
 
 function TermsPage() {

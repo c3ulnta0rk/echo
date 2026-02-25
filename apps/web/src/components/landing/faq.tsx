@@ -46,9 +46,26 @@ const faqs = [
   },
 ];
 
+const faqSchema = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: faq.answer,
+    },
+  })),
+});
+
 export function LandingFaq() {
   return (
     <section className="bg-background py-20 text-foreground">
+      <script
+        dangerouslySetInnerHTML={{ __html: faqSchema }}
+        type="application/ld+json"
+      />
       <div className="container mx-auto max-w-3xl px-4">
         <motion.h2
           className="mb-12 w-full text-center font-bold font-display text-[clamp(1.8rem,4vw,3.2rem)] leading-tight tracking-[-0.03em]"

@@ -15,6 +15,22 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/faq")({
   component: FaqPage,
+  head: () => ({
+    meta: [
+      { title: "FAQ — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "Answers to common questions about Echo: privacy, supported languages, system requirements, keyboard shortcuts, and troubleshooting.",
+      },
+      { property: "og:title", content: "FAQ — Echo Speech-to-Text" },
+      {
+        property: "og:description",
+        content:
+          "Answers to common questions about Echo: privacy, supported languages, system requirements, keyboard shortcuts, and troubleshooting.",
+      },
+    ],
+  }),
 });
 
 function FaqPage() {

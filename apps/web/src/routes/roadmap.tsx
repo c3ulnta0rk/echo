@@ -5,6 +5,22 @@ import { H1, Lead, P } from "@/components/ui/typography";
 
 export const Route = createFileRoute("/roadmap")({
   component: RoadmapPage,
+  head: () => ({
+    meta: [
+      { title: "Roadmap — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "See what's coming next for Echo: planned features, upcoming improvements, and the future of private offline speech-to-text.",
+      },
+      { property: "og:title", content: "Roadmap — Echo Speech-to-Text" },
+      {
+        property: "og:description",
+        content:
+          "See what's coming next for Echo: planned features, upcoming improvements, and the future of private offline speech-to-text.",
+      },
+    ],
+  }),
 });
 
 function RoadmapPage() {

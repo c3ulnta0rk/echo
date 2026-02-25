@@ -4,6 +4,20 @@ import { H1, H2, P } from "@/components/ui/typography";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
+  head: () => ({
+    meta: [
+      { title: "Privacy Policy — Echo Speech-to-Text" },
+      {
+        name: "description",
+        content:
+          "Echo's privacy policy. Echo processes all audio locally on your device. No data is ever sent to any server — your voice stays yours.",
+      },
+      {
+        name: "robots",
+        content: "noindex, follow",
+      },
+    ],
+  }),
 });
 
 function PrivacyPage() {
