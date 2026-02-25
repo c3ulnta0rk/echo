@@ -1,88 +1,106 @@
+"use client";
+
 import { ArrowRight, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { motion, useInView } from "motion/react";
+import { useRef } from "react";
 import { useGithubData } from "@/hooks/use-github-data";
+
+const stats = [
+  {
+    value: "100%",
+    label: "Offline",
+    detail: "Zero bytes sent to any server",
+  },
+  {
+    value: "100+",
+    label: "Languages",
+    detail: "Via Whisper & Parakeet models",
+  },
+  {
+    value: "MIT",
+    label: "Licensed",
+    detail: "Fork it. Ship it. It's yours.",
+  },
+];
 
 export default function Stats() {
   const { stars } = useGithubData();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { once: true, margin: "-100px" });
 
   return (
-    <section className="bg-background py-32 text-foreground">
+    <section className="bg-background py-32 text-foreground" ref={containerRef}>
       <div className="container mx-auto px-4">
-        <div className="grid gap-8 md:grid-cols-3">
-          <div className="grid gap-4 md:col-span-3 lg:grid-cols-3">
-            <div className="flex h-60 flex-col justify-between rounded-lg border border-border bg-secondary/50 p-6">
-              <div className="mb-4">
-                <p className="text-muted-foreground text-sm">Privacy First</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-6xl">100%</h3>
-                <p className="text-base text-foreground/80">
-                  Offline & Private
-                </p>
-              </div>
-            </div>
-
-            <div className="flex h-60 flex-col justify-between rounded-lg border border-border bg-secondary/50 p-6">
-              <div className="mb-4">
-                <p className="text-muted-foreground text-sm">
-                  Language Support
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-6xl">100+</h3>
-                <p className="text-base text-foreground/80">
-                  Languages Supported
-                </p>
-              </div>
-            </div>
-
-            <div className="flex h-60 flex-col justify-between rounded-lg border border-border bg-secondary/50 p-6">
-              <div className="mb-4">
-                <p className="text-muted-foreground text-sm">Open Source</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-6xl">MIT</h3>
-                <p className="text-base text-foreground/80">Licensed & Free</p>
-              </div>
-            </div>
-          </div>
+        {/* Stats as a tight horizontal band */}
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-border md:grid-cols-3">
+          {stats.map((stat, index) => (
+            <motion.div
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+              className="flex flex-col gap-1 bg-secondary/40 p-8 dark:bg-muted/20"
+              initial={{ opacity: 0, y: 16 }}
+              key={stat.label}
+              transition={{
+                duration: 0.5,
+                delay: index * 0.1,
+                ease: "easeOut",
+              }}
+            >
+              <span className="font-display text-4xl tracking-tight md:text-5xl">
+                {stat.value}
+              </span>
+              <span className="font-medium text-foreground text-sm">
+                {stat.label}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {stat.detail}
+              </span>
+            </motion.div>
+          ))}
         </div>
-        <div className="flex flex-col justify-center p-6 py-20 text-center">
-          <div>
-            <h2 className="mb-4 font-medium text-3xl md:text-5xl">
-              Built for privacy, loved for speed
-            </h2>
-            <p className="mb-6 text-lg text-muted-foreground">
-              The speech-to-text tool that respects your data.
-            </p>
-          </div>
-          <div className="flex flex-col items-center gap-4">
-            <Button asChild className="mt-4 h-14 px-10 text-lg">
-              <a href="#download">Download Now</a>
-            </Button>
-            <p className="text-muted-foreground text-xs">
-              macOS, Windows, and Linux supported
-            </p>
+
+        {/* Closing CTA — confident, not desperate */}
+        <motion.div
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+          className="mx-auto mt-24 max-w-xl text-center"
+          initial={{ opacity: 0, y: 24 }}
+          transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+        >
+          <h2 className="font-display text-3xl tracking-tight md:text-5xl">
+            Your voice stays with you
+          </h2>
+          <p className="mt-4 text-muted-foreground">
+            The speech-to-text tool that respects your data. No accounts, no
+            tracking, no cloud — just your words on your machine.
+          </p>
+
+          <a
+            className="mt-8 inline-block rounded-full bg-foreground px-8 py-3.5 font-medium text-background text-sm transition-all duration-300 hover:opacity-90 active:scale-[0.98]"
+            href="#download"
+          >
+            Download for free
+          </a>
+
+          <div className="mt-6 flex items-center justify-center gap-4">
             <a
-              className="flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-primary"
+              className="flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
               href="https://github.com/damien-schneider/Echo"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               target="_blank"
             >
               <div className="flex">
-                <Star className="h-4 w-4 fill-current text-yellow-500" />
-                <Star className="h-4 w-4 fill-current text-yellow-500" />
-                <Star className="h-4 w-4 fill-current text-yellow-500" />
-                <Star className="h-4 w-4 fill-current text-yellow-500" />
-                <Star className="h-4 w-4 fill-current text-yellow-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-500" />
+                <Star className="h-3.5 w-3.5 fill-current text-yellow-500" />
               </div>
-              <span className="text-md text-primary">
+              <span className="text-foreground text-xs">
                 {stars ? `${stars} stars on GitHub` : "Star on GitHub"}
               </span>
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </a>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );

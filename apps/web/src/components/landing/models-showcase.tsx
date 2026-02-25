@@ -1,353 +1,247 @@
 "use client";
 
-import { Cpu, Globe, HardDrive, Languages, Timer, Zap } from "lucide-react";
-import { motion, useInView } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useScroll,
+  useTransform,
+} from "motion/react";
 import { useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 
 interface ModelData {
   id: string;
   name: string;
-  description: string;
-  sizeMb: number;
-  accuracyScore: number;
-  speedScore: number;
-  engine: "whisper" | "parakeet";
-  features: string[];
+  tagline: string;
+  accuracy: number;
+  speed: number;
+  size: string;
+  engine: string;
   recommended?: boolean;
 }
 
 const models: ModelData[] = [
   {
-    id: "parakeet-tdt-0.6b-v3",
+    id: "parakeet-v3",
     name: "Parakeet V3",
-    description: "Fast and accurate with automatic language detection",
-    sizeMb: 478,
-    accuracyScore: 0.8,
-    speedScore: 0.85,
-    engine: "parakeet",
-    features: ["Auto language detection", "CPU optimized", "Fast inference"],
+    tagline: "Fast, accurate, auto-detects language",
+    accuracy: 80,
+    speed: 85,
+    size: "478 MB",
+    engine: "NVIDIA Parakeet",
     recommended: true,
   },
   {
-    id: "parakeet-tdt-0.6b-v2",
+    id: "parakeet-v2",
     name: "Parakeet V2",
-    description: "Best accuracy for English speakers",
-    sizeMb: 473,
-    accuracyScore: 0.85,
-    speedScore: 0.85,
-    engine: "parakeet",
-    features: ["English only", "Highest accuracy", "CPU optimized"],
+    tagline: "Highest accuracy for English",
+    accuracy: 85,
+    speed: 85,
+    size: "473 MB",
+    engine: "NVIDIA Parakeet",
   },
   {
-    id: "small",
+    id: "whisper-small",
     name: "Whisper Small",
-    description: "Fast and fairly accurate",
-    sizeMb: 487,
-    accuracyScore: 0.6,
-    speedScore: 0.85,
-    engine: "whisper",
-    features: ["Multi-language", "GPU accelerated", "Lightweight"],
+    tagline: "Lightweight, 100+ languages",
+    accuracy: 60,
+    speed: 85,
+    size: "487 MB",
+    engine: "OpenAI Whisper",
   },
   {
-    id: "medium",
+    id: "whisper-medium",
     name: "Whisper Medium",
-    description: "Good accuracy, medium speed",
-    sizeMb: 492,
-    accuracyScore: 0.75,
-    speedScore: 0.6,
-    engine: "whisper",
-    features: ["Multi-language", "GPU accelerated", "Balanced"],
+    tagline: "Balanced accuracy and speed",
+    accuracy: 75,
+    speed: 60,
+    size: "492 MB",
+    engine: "OpenAI Whisper",
   },
   {
-    id: "turbo",
+    id: "whisper-turbo",
     name: "Whisper Turbo",
-    description: "Balanced accuracy and speed",
-    sizeMb: 1600,
-    accuracyScore: 0.8,
-    speedScore: 0.4,
-    engine: "whisper",
-    features: ["Multi-language", "GPU accelerated", "High quality"],
+    tagline: "High quality, GPU accelerated",
+    accuracy: 80,
+    speed: 40,
+    size: "1.6 GB",
+    engine: "OpenAI Whisper",
   },
   {
-    id: "large",
+    id: "whisper-large",
     name: "Whisper Large",
-    description: "Highest accuracy for Whisper models",
-    sizeMb: 1100,
-    accuracyScore: 0.85,
-    speedScore: 0.3,
-    engine: "whisper",
-    features: ["Multi-language", "GPU accelerated", "Best quality"],
+    tagline: "Maximum accuracy across all languages",
+    accuracy: 85,
+    speed: 30,
+    size: "1.1 GB",
+    engine: "OpenAI Whisper",
   },
 ];
 
-function ModelCard({
-  model,
-  index,
-  isSelected,
-  onClick,
+function ProgressBar({
+  value,
+  delay,
+  color,
 }: {
-  model: ModelData;
-  index: number;
-  isSelected: boolean;
-  onClick: () => void;
+  value: number;
+  delay: number;
+  color: string;
 }) {
   return (
-    <motion.button
-      animate={{ opacity: 1, y: 0 }}
-      className={`relative w-full cursor-pointer rounded-xl border p-4 text-left transition-all duration-300 ${
-        isSelected
-          ? "border-primary/30 bg-secondary shadow-md shadow-primary/10"
-          : "border-border bg-background hover:bg-secondary"
-      }`}
-      initial={{ opacity: 0, y: 20 }}
-      onClick={onClick}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-    >
-      {model.recommended && (
-        <div className="absolute -top-2 -right-2 rounded-full bg-primary px-2 py-0.5 font-semibold text-[10px] text-primary-foreground">
-          Recommended
-        </div>
-      )}
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="truncate font-medium text-foreground">
-              {model.name}
-            </h3>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 font-medium text-[10px]",
-                model.engine === "parakeet"
-                  ? "bg-green-500/20 text-green-400"
-                  : "bg-blue-500/20 text-blue-400"
-              )}
-            >
-              {model.engine === "parakeet" ? "Parakeet" : "Whisper"}
-            </span>
-          </div>
-          <p className="mt-1 line-clamp-1 text-muted-foreground text-xs">
-            {model.description}
-          </p>
-        </div>
-        <div className="whitespace-nowrap text-muted-foreground text-xs tabular-nums">
-          {model.sizeMb >= 1000
-            ? `${(model.sizeMb / 1000).toFixed(1)} GB`
-            : `${model.sizeMb} MB`}
-        </div>
-      </div>
-
-      {/* Stats bars */}
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="w-14 text-[10px] text-muted-foreground">
-            Accuracy
-          </span>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
-            <motion.div
-              animate={{ width: `${model.accuracyScore * 100}%` }}
-              className="h-full rounded-full bg-primary"
-              initial={{ width: 0 }}
-              transition={{ duration: 0.8, delay: index * 0.1 + 0.3 }}
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-14 text-[10px] text-muted-foreground">Speed</span>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
-            <motion.div
-              animate={{ width: `${model.speedScore * 100}%` }}
-              className="h-full rounded-full bg-green-500"
-              initial={{ width: 0 }}
-              transition={{ duration: 0.8, delay: index * 0.1 + 0.4 }}
-            />
-          </div>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
-
-const getSpeedLabel = (score: number): string => {
-  if (score >= 0.8) {
-    return "Very Fast";
-  }
-  if (score >= 0.5) {
-    return "Medium";
-  }
-  return "Slower";
-};
-
-const getFeatureIcon = (feature: string) => {
-  if (feature.includes("language") || feature.includes("English")) {
-    return <Languages className="h-3 w-3" />;
-  }
-  if (feature.includes("CPU") || feature.includes("GPU")) {
-    return <Cpu className="h-3 w-3" />;
-  }
-  return <Globe className="h-3 w-3" />;
-};
-
-function ModelDetail({ model }: { model: ModelData }) {
-  return (
-    <motion.div
-      animate={{ opacity: 1, x: 0 }}
-      className="flex h-full flex-col"
-      exit={{ opacity: 0, x: -20 }}
-      initial={{ opacity: 0, x: 20 }}
-      key={model.id}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Header */}
-      <div className="mb-6">
-        <div className="mb-2 flex items-center gap-3">
-          <div
-            className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-              model.engine === "parakeet" ? "bg-green-500/20" : "bg-blue-500/20"
-            }`}
-          >
-            {model.engine === "parakeet" ? (
-              <Cpu className="h-5 w-5 text-green-400" />
-            ) : (
-              <Zap className="h-5 w-5 text-blue-400" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-medium text-foreground text-xl">
-              {model.name}
-            </h3>
-            <p className="text-muted-foreground text-sm">{model.description}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-white/5 bg-secondary/30 p-4">
-          <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-            <HardDrive className="h-4 w-4" />
-            <span className="text-xs">Download Size</span>
-          </div>
-          <p className="font-medium text-foreground text-lg tabular-nums">
-            {model.sizeMb >= 1000
-              ? `${(model.sizeMb / 1000).toFixed(1)} GB`
-              : `${model.sizeMb} MB`}
-          </p>
-        </div>
-        <div className="rounded-lg border border-white/5 bg-secondary/30 p-4">
-          <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-            <Timer className="h-4 w-4" />
-            <span className="text-xs">Processing</span>
-          </div>
-          <p className="font-medium text-foreground text-lg">
-            {getSpeedLabel(model.speedScore)}
-          </p>
-        </div>
-      </div>
-
-      {/* Features */}
-      <div className="flex-1">
-        <h4 className="mb-3 font-medium text-foreground text-sm">Features</h4>
-        <div className="flex flex-wrap gap-2">
-          {model.features.map((feature, i) => (
-            <motion.span
-              animate={{ opacity: 1, scale: 1 }}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-secondary/50 px-3 py-1.5 text-foreground text-xs"
-              initial={{ opacity: 0, scale: 0.9 }}
-              key={feature}
-              transition={{ duration: 0.3, delay: i * 0.1 }}
-            >
-              {getFeatureIcon(feature)}
-              {feature}
-            </motion.span>
-          ))}
-        </div>
-      </div>
-
-      {/* Engine badge */}
-      <div className="mt-6 border-white/5 border-t pt-4">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-xs">Engine</span>
-          <span
-            className={`rounded-md px-2 py-1 font-medium text-xs ${
-              model.engine === "parakeet"
-                ? "bg-green-500/20 text-green-400"
-                : "bg-blue-500/20 text-blue-400"
-            }`}
-          >
-            {model.engine === "parakeet" ? "NVIDIA Parakeet" : "OpenAI Whisper"}
-          </span>
-        </div>
-      </div>
-    </motion.div>
+    <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/5">
+      <motion.div
+        animate={{ width: `${value}%` }}
+        className={`h-full rounded-full ${color}`}
+        initial={{ width: 0 }}
+        transition={{ duration: 0.8, delay, ease: "easeOut" }}
+      />
+    </div>
   );
 }
 
 export default function ModelsShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInView = useInView(containerRef, { once: true, margin: "-100px" });
-  const [selectedModel, setSelectedModel] = useState<ModelData>(models[0]);
+  const [active, setActive] = useState(0);
+  const model = models[active];
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start end", "end start"],
+  });
+
+  const titleY = useTransform(scrollYProgress, [0, 0.4], [40, 0]);
+  const titleOpacity = useTransform(scrollYProgress, [0, 0.2], [0, 1]);
 
   return (
     <section
-      className="overflow-hidden bg-background py-20 text-foreground"
+      className="overflow-hidden bg-background py-24 text-foreground md:py-32"
       ref={containerRef}
     >
       <div className="container mx-auto px-4">
         <motion.div
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-          className="mb-12 text-center"
-          initial={{ opacity: 0, y: 24 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="mb-20 text-center"
+          style={{ y: titleY, opacity: titleOpacity }}
         >
-          <h2 className="mb-4 font-medium text-3xl lg:text-5xl">
-            Choose Your Model
+          <h2 className="font-bold font-display text-[clamp(1.8rem,4vw,3.2rem)] leading-tight tracking-[-0.03em]">
+            Six engines,{" "}
+            <span className="font-display font-light text-muted-foreground italic">
+              one shortcut
+            </span>
           </h2>
-          <p className="mx-auto max-w-2xl font-light text-muted-foreground text-sm md:text-base">
-            Echo supports multiple transcription engines. Pick the one that best
-            fits your needs — from lightning-fast CPU models to high-accuracy
-            GPU-accelerated options.
+          <p className="mx-auto mt-4 max-w-lg text-muted-foreground text-sm">
+            From lightning-fast CPU models to high-accuracy GPU options. All run
+            100% locally — pick one and forget about it.
           </p>
         </motion.div>
 
-        <motion.div
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 32 }}
-          className="mx-auto max-w-5xl"
-          initial={{ opacity: 0, y: 32 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-        >
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-            {/* Model List */}
-            <div className="order-2 grid gap-3 sm:grid-cols-2 lg:order-1">
-              {models.map((model, index) => (
-                <ModelCard
-                  index={index}
-                  isSelected={selectedModel.id === model.id}
-                  key={model.id}
-                  model={model}
-                  onClick={() => setSelectedModel(model)}
-                />
-              ))}
-            </div>
+        <div className="mx-auto max-w-3xl">
+          {/* Active model detail — large, minimal */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              className="mb-16 text-center"
+              exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+              initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
+              key={model.id}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-6 inline-flex items-center gap-3">
+                {model.recommended && (
+                  <span className="rounded-full bg-brand px-2.5 py-0.5 font-medium text-[10px] text-white uppercase tracking-wider">
+                    Recommended
+                  </span>
+                )}
+                <span className="rounded-full border border-foreground/10 px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                  {model.engine}
+                </span>
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {model.size}
+                </span>
+              </div>
 
-            {/* Selected Model Detail */}
-            <div className="order-1 h-fit rounded-2xl border border-white/5 bg-secondary/20 p-6 lg:sticky lg:top-24 lg:order-2">
-              <ModelDetail model={selectedModel} />
-            </div>
-          </div>
-        </motion.div>
+              <h3 className="mb-2 font-display text-5xl tracking-tight md:text-7xl">
+                {model.name}
+              </h3>
+              <p className="text-muted-foreground">{model.tagline}</p>
 
-        {/* Bottom note */}
-        <motion.p
-          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-          className="mt-8 text-center text-muted-foreground text-xs"
-          initial={{ opacity: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-        >
-          All models run 100% locally on your device. No cloud processing, no
-          data sent anywhere.
-        </motion.p>
+              {/* Accuracy / Speed bars */}
+              <div className="mx-auto mt-10 grid max-w-sm grid-cols-2 gap-8">
+                <div>
+                  <div className="mb-2 flex items-baseline justify-between">
+                    <span className="text-muted-foreground text-xs">
+                      Accuracy
+                    </span>
+                    <span className="font-mono text-foreground text-xs tabular-nums">
+                      {model.accuracy}%
+                    </span>
+                  </div>
+                  <ProgressBar
+                    color="bg-foreground"
+                    delay={0.1}
+                    value={model.accuracy}
+                  />
+                </div>
+                <div>
+                  <div className="mb-2 flex items-baseline justify-between">
+                    <span className="text-muted-foreground text-xs">Speed</span>
+                    <span className="font-mono text-foreground text-xs tabular-nums">
+                      {model.speed}%
+                    </span>
+                  </div>
+                  <ProgressBar
+                    color="bg-brand"
+                    delay={0.2}
+                    value={model.speed}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Model selector — horizontal pills */}
+          <motion.div
+            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+            className="flex flex-wrap items-center justify-center gap-2"
+            initial={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+          >
+            {models.map((m, i) => (
+              <button
+                className={`relative cursor-pointer rounded-full px-4 py-2 text-sm transition-all duration-300 ${
+                  i === active
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground/70"
+                }`}
+                key={m.id}
+                onClick={() => setActive(i)}
+                type="button"
+              >
+                {i === active && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full border border-foreground/15 bg-foreground/5"
+                    layoutId="model-pill"
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                    }}
+                  />
+                )}
+                <span className="relative z-10">{m.name}</span>
+              </button>
+            ))}
+          </motion.div>
+
+          <motion.p
+            animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+            className="mt-12 text-center text-muted-foreground/60 text-xs"
+            initial={{ opacity: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+          >
+            All models are downloaded once and run entirely on your device.
+          </motion.p>
+        </div>
       </div>
     </section>
   );

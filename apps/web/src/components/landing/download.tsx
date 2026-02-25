@@ -1,145 +1,145 @@
 "use client";
 
 import { AppleIcon, Monitor, Terminal } from "lucide-react";
+import { motion, useInView, useScroll, useTransform } from "motion/react";
+import { useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useGithubData } from "@/hooks/use-github-data";
 
 const Download = () => {
-  const { downloadLinks } = useGithubData();
+  const { downloadLinks, stars } = useGithubData();
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const glowY = useTransform(scrollYProgress, [0, 1], ["20%", "-20%"]);
 
   const fallbackUrl =
     "https://github.com/damien-schneider/Echo/releases/latest";
 
+  const platforms = [
+    {
+      name: "macOS",
+      icon: AppleIcon,
+      primary: { label: "Apple Silicon", href: downloadLinks.macSilicon },
+      secondary: { label: "Intel", href: downloadLinks.macIntel },
+      req: "macOS 11.0+",
+    },
+    {
+      name: "Windows",
+      icon: Monitor,
+      primary: { label: "Download x64", href: downloadLinks.windows },
+      req: "Windows 10 (64-bit)",
+    },
+    {
+      name: "Linux",
+      icon: Terminal,
+      primary: { label: "AppImage", href: downloadLinks.linuxAppImage },
+      secondary: { label: ".deb", href: downloadLinks.linuxDeb },
+      req: "glibc \u2265 2.28",
+    },
+  ];
+
   return (
-    <section className="bg-background py-20 text-foreground" id="download">
-      <div className="container mx-auto px-4">
-        <h2 className="mb-10 w-full text-center font-medium text-5xl tracking-tighter">
-          Download Echo
-        </h2>
-        <div className="grid h-full w-full gap-6 rounded-xl border bg-secondary p-10 md:grid-cols-3">
-          {/* macOS */}
-          <div className="">
-            <div className="space-y-10">
-              <div className="flex h-[50px] w-[50px] items-center justify-center">
-                <AppleIcon className="text-foreground" size={50} />
-              </div>
-              <h2 className="w-full font-medium text-5xl tracking-tighter">
-                macOS
-              </h2>
-              <div className="space-y-2">
-                <Button asChild className="mx-auto h-12 w-full max-w-sm">
-                  <a href={downloadLinks.macSilicon || fallbackUrl}>
-                    Download for Apple Silicon
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  className="mx-auto h-12 w-full max-w-sm"
-                  variant="outline"
-                >
-                  <a href={downloadLinks.macIntel || fallbackUrl}>
-                    Download for Intel
-                  </a>
-                </Button>
+    <section
+      className="relative overflow-hidden bg-background py-24 text-foreground md:py-36"
+      id="download"
+      ref={ref}
+    >
+      {/* Subtle glow */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <motion.div
+          className="absolute bottom-0 left-1/2 h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-brand/[0.04] blur-[120px]"
+          style={{ y: glowY }}
+        />
+      </div>
+
+      <div className="container relative z-10 mx-auto px-4">
+        <motion.div
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+          className="mb-16 text-center"
+          initial={{ opacity: 0, y: 24 }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <h2 className="font-bold font-display text-[clamp(2rem,5vw,4rem)] leading-tight tracking-[-0.03em]">
+            Download Echo{" "}
+            <span className="font-display font-light text-muted-foreground italic">
+              — it's free
+            </span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-md text-muted-foreground text-sm">
+            No account. No tracking. No cloud. Free forever under the MIT
+            license.
+          </p>
+          {stars != null && stars > 0 && (
+            <p className="mt-3 text-muted-foreground/50 text-xs">
+              {stars.toLocaleString()} stars on GitHub
+            </p>
+          )}
+        </motion.div>
+
+        <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-3">
+          {platforms.map((platform, i) => (
+            <motion.div
+              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              className="flex flex-col rounded-2xl border border-border/60 bg-card p-6 transition-colors hover:border-foreground/15"
+              initial={{ opacity: 0, y: 20 }}
+              key={platform.name}
+              transition={{
+                duration: 0.5,
+                delay: 0.15 + i * 0.1,
+                ease: "easeOut",
+              }}
+              whileHover={{ y: -3 }}
+            >
+              <div className="mb-6 flex items-center gap-3">
+                <platform.icon className="h-6 w-6 text-foreground" />
+                <span className="font-bold font-display text-foreground text-lg tracking-tight">
+                  {platform.name}
+                </span>
               </div>
 
-              <div className="">
-                <p className="text-muted-foreground text-sm">
-                  Minimum Requirements:
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  macOS 11.0 (Big Sur) or later.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Windows */}
-          <div className="items-start md:flex">
-            <Separator
-              className="mr-6 hidden h-full md:block"
-              orientation="vertical"
-            />
-            <Separator className="mb-6 block md:hidden" />
-            <div className="w-full space-y-10">
-              <div className="flex h-[50px] w-[50px] items-center justify-center">
-                <Monitor className="text-foreground" size={50} />
-              </div>
-              <h2 className="w-full font-medium text-5xl tracking-tighter">
-                Windows
-              </h2>
-              <div className="space-y-2">
-                <Button asChild className="mx-auto h-12 w-full max-w-sm">
-                  <a href={downloadLinks.windows || fallbackUrl}>
-                    Download for x64
+              <div className="mb-4 flex-1 space-y-2">
+                <Button asChild className="h-11 w-full">
+                  <a href={platform.primary.href || fallbackUrl}>
+                    {platform.primary.label}
                   </a>
                 </Button>
+                {platform.secondary && (
+                  <Button asChild className="h-11 w-full" variant="outline">
+                    <a href={platform.secondary.href || fallbackUrl}>
+                      {platform.secondary.label}
+                    </a>
+                  </Button>
+                )}
               </div>
 
-              <div className="">
-                <p className="text-muted-foreground text-sm">
-                  Minimum Requirements:
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  Windows 10 (64-bit)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Linux */}
-          <div className="items-start md:flex">
-            <Separator
-              className="mr-6 hidden h-full md:block"
-              orientation="vertical"
-            />
-            <Separator className="mb-6 block md:hidden" />
-            <div className="w-full space-y-10">
-              <div className="flex h-[50px] w-[50px] items-center justify-center">
-                <Terminal className="text-foreground" size={50} />
-              </div>
-              <h2 className="w-full font-medium text-5xl tracking-tighter">
-                Linux
-              </h2>
-              <div className="space-y-2">
-                <Button asChild className="mx-auto h-12 w-full max-w-sm">
-                  <a href={downloadLinks.linuxAppImage || fallbackUrl}>
-                    Download AppImage
-                  </a>
-                </Button>
-                <Button
-                  asChild
-                  className="mx-auto h-12 w-full max-w-sm"
-                  variant="outline"
-                >
-                  <a href={downloadLinks.linuxDeb || fallbackUrl}>
-                    Download .deb
-                  </a>
-                </Button>
-              </div>
-
-              <div className="mt-20">
-                <p className="text-muted-foreground text-sm">
-                  Minimum Requirements:
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  {"glibc >= 2.28 (e.g., Ubuntu 20, Debian 10)"}
-                </p>
-              </div>
-            </div>
-          </div>
+              <p className="text-[11px] text-muted-foreground/60">
+                {platform.req}
+              </p>
+            </motion.div>
+          ))}
         </div>
-        <p className="my-6 w-full text-center text-md text-muted-foreground">
-          Looking for other versions?
+
+        <motion.p
+          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+          className="mt-8 text-center text-muted-foreground text-sm"
+          initial={{ opacity: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          Looking for other versions?{" "}
           <a
-            className="ml-1 cursor-pointer font-semibold text-primary hover:underline"
+            className="font-semibold text-foreground underline decoration-brand/40 underline-offset-2 hover:decoration-brand"
             href="https://github.com/damien-schneider/Echo/releases"
           >
             View all releases
           </a>
-        </p>
+        </motion.p>
       </div>
     </section>
   );
