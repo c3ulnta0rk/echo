@@ -3,28 +3,31 @@ import {
   Box,
   History,
   Keyboard,
+  PanelLeft,
   Settings2,
   Sparkles,
   Speech,
 } from "lucide-react";
 import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PanelImperativeHandle } from "react-resizable-panels";
 import { FileTranscriptionCenter } from "@/components/file-transcription-center";
 import EchoLogo from "@/components/icons/echo-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { Button } from "@/components/ui/button";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-} from "@/components/ui/sidebar";
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { getNormalizedOsPlatform } from "@/lib/os";
 import { cn } from "@/lib/utils";
 import { AboutDialog } from "./settings/about/about-dialog";
 import { AppSettings } from "./settings/app/app-settings";
@@ -34,6 +37,8 @@ import { ModelsSettings } from "./settings/models/models-settings";
 import { PostProcessingSettings } from "./settings/post-processing/post-processing-settings";
 import { TranscriptionSettings } from "./settings/transcription/transcription-settings";
 import { TtsSettingsPage } from "./settings/tts-settings-page";
+
+const isMacOS = getNormalizedOsPlatform() === "mac";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
 
@@ -85,87 +90,82 @@ export const SECTIONS_CONFIG = {
   },
 } as const satisfies Record<string, SectionConfig>;
 
-function SidebarVersionFooter() {
-  return (
-    <SidebarFooter className="select-none" data-tauri-drag-region>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <ThemeSwitcher />
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <FileTranscriptionCenter />
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <div className="flex items-center py-1.5">
-            <AboutDialog />
-          </div>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarFooter>
-  );
-}
+const DEFAULT_SIDEBAR_WIDTH = "220px";
+const MIN_SIDEBAR_WIDTH = "180px";
+const MAX_SIDEBAR_WIDTH = "320px";
 
 function AppSidebar({
   activeSection,
   onSectionChange,
-  ...props
 }: {
   activeSection: SidebarSection;
   onSectionChange: (section: SidebarSection) => void;
-} & React.ComponentProps<typeof Sidebar>) {
+}) {
   const availableSections = Object.entries(SECTIONS_CONFIG).map(
     ([id, config]) => ({ id: id as SidebarSection, ...config })
   );
 
   return (
-    <Sidebar collapsible="icon" variant="inset" {...props}>
-      <SidebarHeader className="select-none" data-tauri-drag-region>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              className="select-none hover:bg-transparent active:bg-transparent"
-              data-tauri-drag-region-with-children
-              size="lg"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
-                <EchoLogo className="size-4" data-tauri-drag-region />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Echo</span>
-                <span className="truncate text-muted-foreground text-xs">
-                  Settings
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent data-tauri-drag-region>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {availableSections.map((section) => {
-                const Icon = section.icon;
-                return (
-                  <SidebarMenuItem key={section.id}>
-                    <SidebarMenuButton
-                      isActive={activeSection === section.id}
-                      onClick={() => onSectionChange(section.id)}
-                      tooltip={section.label}
-                    >
-                      <Icon />
-                      <span>{section.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarVersionFooter />
-      <SidebarRail />
-    </Sidebar>
+    <div
+      className="flex h-full w-full flex-col rounded-xl bg-foreground/5 p-2"
+      data-tauri-drag-region
+    >
+      {/* Header: Logo */}
+      <div
+        className="flex shrink-0 select-none items-center gap-2 p-2"
+        data-tauri-drag-region
+      >
+        <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
+          <EchoLogo className="size-4" data-tauri-drag-region />
+        </div>
+        <div className="grid flex-1 text-left text-sm leading-tight">
+          <span className="truncate font-semibold">Echo</span>
+          <span className="truncate text-muted-foreground text-xs">
+            Settings
+          </span>
+        </div>
+      </div>
+
+      {/* Body: Scrollable menu items */}
+      <ScrollArea
+        className="-mx-2 min-h-16 flex-1"
+        classNameViewport="min-w-0 overflow-x-hidden p-2"
+        showMask={false}
+      >
+        <div className="flex flex-col gap-1" data-tauri-drag-region>
+          {availableSections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Button
+                className={cn(
+                  "w-full justify-start gap-2 font-normal",
+                  activeSection === section.id &&
+                    "bg-foreground/8 text-foreground"
+                )}
+                key={section.id}
+                onClick={() => onSectionChange(section.id)}
+                variant="ghost"
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{section.label}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div
+        className="flex shrink-0 select-none flex-col gap-1"
+        data-tauri-drag-region
+      >
+        <ThemeSwitcher />
+        <FileTranscriptionCenter />
+        <div className="flex items-center py-1.5">
+          <AboutDialog />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -178,47 +178,96 @@ export function SidebarLayout({
   onSectionChange: (section: SidebarSection) => void;
   children: React.ReactNode;
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
+
+  const toggleSidebar = useCallback(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) {
+      return;
+    }
+    if (panel.isCollapsed()) {
+      panel.expand();
+      setSidebarOpen(true);
+    } else {
+      panel.collapse();
+      setSidebarOpen(false);
+    }
+  }, []);
+
+  // Keyboard shortcut: Cmd+B / Ctrl+B
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "b" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSidebar]);
+
   return (
-    <SidebarProvider defaultOpen={false}>
-      <AppSidebar
-        activeSection={activeSection}
-        onSectionChange={onSectionChange}
-      />
-      <SidebarInset
-        className={cn(
-          "flex flex-col overflow-hidden",
-          // Override the default ml-0 for inset variant when sidebar is expanded
-          "md:peer-data-[state=expanded]:peer-data-[variant=inset]:ml-[var(--sidebar-width)]",
-          // When collapsed, no margin
-          "md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-0",
-          // Smooth transition
-          "transition-[margin] duration-200 ease-linear"
-        )}
+    <TooltipProvider delayDuration={0}>
+      <div
+        className={cn("flex h-[calc(100vh-2rem)] w-full gap-0 p-2 pt-0")}
         data-tauri-drag-region
       >
-        <div
-          className="flex h-full w-full overflow-auto pt-4 *:w-full"
-          data-tauri-drag-region
-        >
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        <ResizablePanelGroup className="h-full flex-1" orientation="horizontal">
+          <ResizablePanel
+            collapsedSize={0}
+            collapsible
+            defaultSize={DEFAULT_SIDEBAR_WIDTH}
+            maxSize={MAX_SIDEBAR_WIDTH}
+            minSize={MIN_SIDEBAR_WIDTH}
+            onResize={() => {
+              const collapsed = sidebarPanelRef.current?.isCollapsed() ?? false;
+              setSidebarOpen(!collapsed);
+            }}
+            panelRef={sidebarPanelRef}
+          >
+            <AppSidebar
+              activeSection={activeSection}
+              onSectionChange={onSectionChange}
+            />
+          </ResizablePanel>
+          <ResizableHandle
+            className={cn(
+              "transition-[width,margin] duration-200",
+              !sidebarOpen && "z-10 -mr-2 w-2"
+            )}
+            withHandle
+          />
+          <ResizablePanel className="flex h-full min-h-0">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {/* Toggle button when sidebar is collapsed */}
+              {!sidebarOpen && (
+                <div className="shrink-0 px-2 pt-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+                        onClick={toggleSidebar}
+                        type="button"
+                      >
+                        <PanelLeft className="size-4" />
+                        <span className="sr-only">Toggle Sidebar</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Toggle Sidebar</TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+              <ScrollArea
+                className="min-h-0 flex-1"
+                classNameViewport="pt-4 *:w-full"
+              >
+                <div data-tauri-drag-region>{children}</div>
+              </ScrollArea>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+    </TooltipProvider>
   );
 }
-
-// Keep backwards compatibility
-export const Sidemenu = ({
-  activeSection,
-  onSectionChange,
-}: {
-  activeSection: SidebarSection;
-  onSectionChange: (section: SidebarSection) => void;
-}) => (
-  <SidebarProvider defaultOpen={false}>
-    <AppSidebar
-      activeSection={activeSection}
-      onSectionChange={onSectionChange}
-    />
-  </SidebarProvider>
-);

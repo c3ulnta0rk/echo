@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ModelInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatModelSize } from "@/lib/utils/format";
@@ -124,9 +124,8 @@ const ModelDropdown: React.FC<ModelDropdownProps> = ({
       <DropdownMenuContent align="start" className="w-92 p-0!" side="top">
         <ScrollArea
           className="p-0! *:max-h-[200px] *:p-2"
-          disableMaskingSide={["left", "right"]}
+          scrollbars="vertical"
         >
-          <ScrollBar orientation="vertical" />
           {/* First Run Welcome */}
           {isFirstRun && (
             <div className="mb-1 rounded-xl border border-foreground/10 bg-background/10 px-3 py-2 backdrop-blur-lg">
