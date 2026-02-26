@@ -1,6 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-  type CSSProperties,
   type HTMLAttributes,
   type ReactNode,
   type Ref,
@@ -64,12 +63,12 @@ const GlassWindow = ({
   return (
     <div
       className={cn(
-        "relative flex h-screen flex-col bg-background/90 rounded-[1.25rem] backdrop-blur-sm",
+        "relative flex h-screen flex-col rounded-[1.25rem] bg-background/90 backdrop-blur-sm",
         className
       )}
       ref={ref}
       style={{
-        boxShadow: "var(--window-shadow)"
+        boxShadow: "var(--window-shadow)",
       }}
       {...props}
     >
@@ -86,8 +85,7 @@ const GlassWindow = ({
         />
       )}
 
-        {children}
-
+      {children}
     </div>
   );
 };
