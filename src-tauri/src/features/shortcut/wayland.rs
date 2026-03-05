@@ -187,6 +187,7 @@ async fn wayland_manager_task(
     info!("[Wayland] Manager task: created GlobalShortcuts session successfully");
 
     // 3. Initial bind
+
     match do_bind_shortcuts(&portal, &session, &app, None).await {
         Ok(_) => {
             let _ = init_tx.send(Ok(()));
@@ -294,7 +295,10 @@ async fn do_bind_shortcuts(
     // GNOME caches shortcut triggers in dconf and ignores preferred_trigger;
     // without this, the portal always returns the stale cached value.
     if let Err(e) = update_dconf_shortcuts(app) {
-        warn!("[Wayland] Failed to update dconf shortcuts (continuing): {}", e);
+        warn!(
+            "[Wayland] Failed to update dconf shortcuts (continuing): {}",
+            e
+        );
     }
 
     // Load settings and get bindings
@@ -564,10 +568,7 @@ fn update_dconf_shortcuts(app: &AppHandle) -> Result<(), String> {
 
             if !write.status.success() {
                 let stderr = String::from_utf8_lossy(&write.stderr);
-                error!(
-                    "[Wayland] dconf write failed for '{}': {}",
-                    app_id, stderr
-                );
+                error!("[Wayland] dconf write failed for '{}': {}", app_id, stderr);
             } else {
                 info!(
                     "[Wayland] Successfully updated dconf shortcuts for '{}'",
@@ -602,9 +603,7 @@ fn to_gtk_accelerator(binding: &str) -> String {
             "ctrl" | "control" => result.push_str("<Control>"),
             "alt" | "option" => result.push_str("<Alt>"),
             "shift" => result.push_str("<Shift>"),
-            "meta" | "cmd" | "command" | "super" | "win" | "windows" => {
-                result.push_str("<Super>")
-            }
+            "meta" | "cmd" | "command" | "super" | "win" | "windows" => result.push_str("<Super>"),
             key => result.push_str(key),
         }
     }
@@ -733,13 +732,12 @@ pub async fn open_wayland_shortcut_settings(app: &AppHandle) -> Result<(), Strin
     let window_identifier = get_window_identifier(app).await;
     debug!("[Wayland] Window identifier: {:?}", window_identifier);
 
-    request_configure(app, window_identifier).await.map_err(|e| {
-        error!(
-            "[Wayland] Failed to open shortcut settings dialog: {}",
+    request_configure(app, window_identifier)
+        .await
+        .map_err(|e| {
+            error!("[Wayland] Failed to open shortcut settings dialog: {}", e);
             e
-        );
-        e
-    })
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -1105,15 +1103,9 @@ mod tests {
     #[test]
     fn test_to_gtk_accelerator() {
         assert_eq!(to_gtk_accelerator("ctrl+space"), "<Control>space");
-        assert_eq!(
-            to_gtk_accelerator("ctrl+shift+r"),
-            "<Control><Shift>r"
-        );
+        assert_eq!(to_gtk_accelerator("ctrl+shift+r"), "<Control><Shift>r");
         assert_eq!(to_gtk_accelerator("alt+a"), "<Alt>a");
-        assert_eq!(
-            to_gtk_accelerator("super+shift+f1"),
-            "<Super><Shift>f1"
-        );
+        assert_eq!(to_gtk_accelerator("super+shift+f1"), "<Super><Shift>f1");
         assert_eq!(to_gtk_accelerator("meta+x"), "<Super>x");
     }
 

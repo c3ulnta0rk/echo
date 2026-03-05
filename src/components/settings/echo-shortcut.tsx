@@ -1,39 +1,37 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { type } from "@tauri-apps/plugin-os";
 import { AlertTriangle, Keyboard, RotateCcw } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { SettingContainer } from "@/components/ui/setting-container";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  formatKeyCombination,
-  getKeyName,
-  normalizeKey,
-  type OSType,
-} from "@/lib/utils/keyboard";
-import {
   useSetting,
   useSettingsActions,
   useSettingsStore,
 } from "@/stores/settings-store";
-
-/** Wayland shortcut info from the portal */
-interface WaylandShortcutInfo {
-  has_printable_key: boolean;
-  id: string;
-  trigger: string;
-}
+import {
+  formatKeyCombination,
+  getKeyName,
+  normalizeKey,
+  type OSType,
+} from "../../lib/utils/keyboard";
+import { Button } from "../ui/button";
+import { SettingContainer } from "../ui/setting-container";
 
 interface EchoShortcutProps {
   descriptionMode?: "inline" | "tooltip";
   grouped?: boolean;
+}
+
+interface WaylandShortcutInfo {
+  has_printable_key: boolean;
+  id: string;
+  trigger: string;
 }
 
 export const EchoShortcut: React.FC<EchoShortcutProps> = ({
@@ -56,62 +54,6 @@ export const EchoShortcut: React.FC<EchoShortcutProps> = ({
     WaylandShortcutInfo[]
   >([]);
   const shortcutRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-
-  // Detect if running on Wayland
-  useEffect(() => {
-    const checkWayland = async () => {
-      try {
-        const wayland = await invoke<boolean>("is_wayland_session");
-        setIsWayland(wayland);
-        if (wayland) {
-          // Fetch current Wayland shortcuts
-          const shortcuts = await invoke<WaylandShortcutInfo[]>(
-            "get_wayland_shortcuts"
-          );
-          setWaylandShortcuts(shortcuts);
-        }
-      } catch (error) {
-        console.error("Failed to check Wayland session:", error);
-      }
-    };
-    checkWayland();
-  }, []);
-
-  // Listen for Wayland shortcut updates (initial bind + rebind fallback)
-  useEffect(() => {
-    if (!isWayland) {
-      return;
-    }
-
-    const unlisten = listen<WaylandShortcutInfo[]>(
-      "wayland-shortcuts-ready",
-      (event) => {
-        setWaylandShortcuts(event.payload);
-      }
-    );
-
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [isWayland]);
-
-  // Listen for shortcut changes from the system configure dialog (portal v2)
-  useEffect(() => {
-    if (!isWayland) {
-      return;
-    }
-
-    const unlisten = listen<WaylandShortcutInfo[]>(
-      "wayland-shortcuts-changed",
-      (event) => {
-        setWaylandShortcuts(event.payload);
-      }
-    );
-
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [isWayland]);
 
   // Detect and store OS type
   useEffect(() => {
