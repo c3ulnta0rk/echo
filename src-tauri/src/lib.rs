@@ -8,12 +8,12 @@ mod helpers;
 mod llm_client;
 mod logging;
 mod managers;
-mod tools;
 mod overlay;
 mod settings;
 #[cfg(unix)]
 mod signal_handle;
 mod startup;
+mod tools;
 mod tray;
 mod utils;
 mod wayland;
@@ -359,7 +359,164 @@ async fn validate_and_transcribe_file_icon_drop(
     Ok(())
 }
 
+/// Ensure the app has a correctly-named `.desktop` file and is running inside a
+/// systemd app scope so the XDG Desktop Portal can resolve a valid app_id.
+///
+/// GNOME's portal resolves the app_id from the calling process's systemd cgroup.
+/// When launched from a terminal, the process inherits the terminal's cgroup and
+/// the portal can't resolve an app_id → global shortcuts are rejected.
+///
+/// This function:
+/// 1. Creates `com.damien-schneider.echo.desktop` in `~/.local/share/applications/`
+///    if no matching `.desktop` file exists (so GNOME can associate the app_id).
+/// 2. Re-execs the process inside a named systemd scope (`app-gnome-com.damien\x2dschneider.echo-<PID>.scope`)
+///    if it's not already in one.
+#[cfg(target_os = "linux")]
+fn ensure_desktop_integration() {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let app_id = "com.damien-schneider.echo";
+    let desktop_filename = format!("{}.desktop", app_id);
+
+    // Only relevant for Wayland sessions
+    if !std::env::var("XDG_SESSION_TYPE")
+        .map(|s| s.eq_ignore_ascii_case("wayland"))
+        .unwrap_or(false)
+    {
+        return;
+    }
+
+    // --- Step 1: Ensure .desktop file exists ---
+
+    let system_path = PathBuf::from("/usr/share/applications").join(&desktop_filename);
+    let data_home = std::env::var("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            PathBuf::from(home).join(".local/share")
+        });
+    let local_apps_dir = data_home.join("applications");
+    let local_path = local_apps_dir.join(&desktop_filename);
+
+    if !system_path.exists() && !local_path.exists() {
+        // Create the .desktop file in the user directory
+        if let Err(e) = fs::create_dir_all(&local_apps_dir) {
+            eprintln!(
+                "[Desktop Integration] Failed to create applications dir: {}",
+                e
+            );
+        } else {
+            let exe_path = std::env::current_exe()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "echo".to_string());
+
+            let desktop_content = format!(
+                "[Desktop Entry]\n\
+                 Type=Application\n\
+                 Name=Echo\n\
+                 Comment=Speech to text transcription\n\
+                 Exec={exe_path}\n\
+                 Icon=echo\n\
+                 Terminal=false\n\
+                 StartupWMClass=echo\n\
+                 Categories=Utility;Audio;\n"
+            );
+
+            match fs::write(&local_path, desktop_content) {
+                Ok(()) => {
+                    eprintln!("[Desktop Integration] Created {}", local_path.display());
+                    // Update the desktop database (best-effort)
+                    let _ = Command::new("update-desktop-database")
+                        .arg(&local_apps_dir)
+                        .output();
+                }
+                Err(e) => {
+                    eprintln!("[Desktop Integration] Failed to write .desktop file: {}", e);
+                }
+            }
+        }
+    }
+
+    // --- Step 2: Re-exec in a systemd app scope if needed ---
+
+    // Check if already in an app scope
+    let cgroup = match fs::read_to_string("/proc/self/cgroup") {
+        Ok(c) => c,
+        Err(_) => return, // Can't read cgroup, skip
+    };
+
+    // If any cgroup line contains "app-" in the unit name, we're already scoped
+    let already_in_scope = cgroup.lines().any(|line| {
+        // cgroup v2 format: "0::/user.slice/.../*.scope"
+        // cgroup v1 format: "N:name=systemd:/user.slice/.../*.scope"
+        line.contains("app-")
+    });
+
+    if already_in_scope {
+        return;
+    }
+
+    // Check that systemd-run is available
+    let systemd_run_available = Command::new("systemd-run")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !systemd_run_available {
+        eprintln!("[Desktop Integration] systemd-run not available, skipping scope re-exec");
+        eprintln!("[Desktop Integration] Global shortcuts may not work on GNOME Wayland");
+        return;
+    }
+
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let pid = std::process::id();
+
+    // Systemd unit names escape dashes as \x2d
+    // "com.damien-schneider.echo" → "com.damien\\x2dschneider.echo"
+    let escaped_id = app_id.replace('-', "\\x2d");
+    let unit_name = format!("app-gnome-{}-{}.scope", escaped_id, pid);
+
+    let original_args: Vec<String> = std::env::args().skip(1).collect();
+
+    let mut cmd = Command::new("systemd-run");
+    cmd.arg("--user")
+        .arg("--scope")
+        .arg(format!("--unit={}", unit_name))
+        .arg("--")
+        .arg(&exe);
+    for arg in &original_args {
+        cmd.arg(arg);
+    }
+
+    // Inherit environment
+    eprintln!(
+        "[Desktop Integration] Re-launching in systemd scope: {}",
+        unit_name
+    );
+
+    match cmd.spawn() {
+        Ok(_) => {
+            // The new process is running in the correct scope — exit this one
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("[Desktop Integration] Failed to re-exec in scope: {}", e);
+            eprintln!("[Desktop Integration] Continuing without scope — shortcuts may not work");
+        }
+    }
+}
+
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    ensure_desktop_integration();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Check if any arguments look like file paths (icon drops)
@@ -491,11 +648,10 @@ pub fn run() {
                 // ============================================================
 
                 #[cfg(target_os = "macos")]
-                #[allow(deprecated)] // cocoa crate is deprecated in favor of objc2-app-kit
+                #[allow(deprecated)]
+                // cocoa crate is deprecated in favor of objc2-app-kit
                 {
-                    use cocoa::appkit::{
-                        NSWindow, NSWindowStyleMask, NSWindowTitleVisibility,
-                    };
+                    use cocoa::appkit::{NSWindow, NSWindowStyleMask, NSWindowTitleVisibility};
                     use cocoa::base::{id, YES};
 
                     // The window is created with decorations: false (required
@@ -516,9 +672,8 @@ pub fn run() {
                                     | NSWindowStyleMask::NSFullSizeContentViewWindowMask,
                             );
                             window.setTitlebarAppearsTransparent_(YES);
-                            window.setTitleVisibility_(
-                                NSWindowTitleVisibility::NSWindowTitleHidden,
-                            );
+                            window
+                                .setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
                         }
                     }
                 }
