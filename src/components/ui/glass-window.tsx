@@ -63,7 +63,8 @@ const GlassWindow = ({
   return (
     <div
       className={cn(
-        "relative flex h-screen flex-col rounded-[1.25rem] bg-background/90 backdrop-blur-sm",
+        "relative flex h-screen flex-col rounded-[1.125rem] backdrop-blur-sm",
+        isLinux ? "bg-background" : "bg-background/90",
         className
       )}
       ref={ref}
