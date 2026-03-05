@@ -1,9 +1,9 @@
 use crate::settings::{self, OverlayPosition};
 #[cfg(not(target_os = "linux"))]
 use enigo::{Enigo, Mouse};
-use log::{debug, info, warn};
 #[cfg(target_os = "linux")]
 use log::error;
+use log::{debug, info, warn};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 #[cfg(not(target_os = "linux"))]
 use tauri::{PhysicalPosition, PhysicalSize};
@@ -119,10 +119,13 @@ fn get_overlay_dimensions(
     Some(compute_overlay_geometry(mon_x, mon_y, mon_w, mon_h, position))
 }
 
-/// Creates the recording overlay window as a small transparent, always-visible window
-/// sized to fit the notch + animation padding. The React component initializes in its
-/// CSS-hidden state (opacity-0), so no flash occurs.
-/// The window must be visible from creation for `always_on_top` to work reliably on macOS.
+/// Creates the recording overlay window as a small transparent window sized to fit the
+/// notch + animation padding. The React component initializes in its CSS-hidden state
+/// (opacity-0), so no flash occurs.
+///
+/// On macOS the window must be visible from creation for `always_on_top` to work reliably.
+/// On Linux, the window is created hidden to avoid stealing focus at startup (Wayland
+/// compositors ignore the `focused(false)` hint). It is shown later by `show_recording_overlay()`.
 pub fn create_recording_overlay(app_handle: &AppHandle) {
     #[cfg(target_os = "linux")]
     let is_wayland_session = crate::wayland::is_wayland();
@@ -160,7 +163,9 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         .skip_taskbar(true)
         .transparent(true)
         .focused(false)
-        .visible(true);
+        // macOS: visible from creation so always_on_top works reliably.
+        // Linux: hidden to avoid stealing focus at startup (shown later on demand).
+        .visible(cfg!(not(target_os = "linux")));
 
         // On Wayland, some window hints may behave differently
         // The overlay should still work but may have compositor-specific behavior
@@ -213,7 +218,11 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     }
                 }
 
-                // Window is visible from creation — enable click-through immediately
+                // On non-Linux the window is already visible, enable click-through now.
+                // On Linux the window starts hidden; calling set_ignore_cursor_events
+                // on an unrealised Wayland window panics in tao, so we defer it to
+                // show_recording_overlay().
+                #[cfg(not(target_os = "linux"))]
                 if let Err(e) = _window.set_ignore_cursor_events(true) {
                     warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
                 }
@@ -248,6 +257,20 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
 
         if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
             debug!("[Overlay] Showing recording overlay");
+
+            // On Linux the overlay starts hidden (to avoid stealing focus at startup).
+            // Show it now and enable click-through once the GdkWindow is realised.
+            #[cfg(target_os = "linux")]
+            {
+                if let Err(e) = overlay_window.show() {
+                    error!("[Overlay] Failed to show overlay window: {}", e);
+                    return;
+                }
+                if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
+                    warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
+                }
+            }
+
             // On Wayland, we handle positioning via layer shell anchors
             #[cfg(target_os = "linux")]
             {
@@ -314,6 +337,15 @@ pub fn show_transcribing_overlay(app_handle: &AppHandle) {
         update_overlay_position(&app_handle);
 
         if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+            // On Linux, show the hidden window (see create_recording_overlay for rationale)
+            #[cfg(target_os = "linux")]
+            {
+                let _ = overlay_window.show();
+                if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
+                    warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
+                }
+            }
+
             // On Wayland, bring window to front via GTK APIs
             #[cfg(target_os = "linux")]
             if crate::wayland::is_wayland() {
@@ -347,6 +379,15 @@ pub fn show_warning_overlay(app_handle: &AppHandle, message: &str) {
     update_overlay_position(app_handle);
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+        // On Linux, show the hidden window
+        #[cfg(target_os = "linux")]
+        {
+            let _ = overlay_window.show();
+            if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
+                warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
+            }
+        }
+
         // On Wayland, bring window to front via GTK APIs
         #[cfg(target_os = "linux")]
         if crate::wayland::is_wayland() {
@@ -372,6 +413,12 @@ pub fn show_warning_overlay(app_handle: &AppHandle, message: &str) {
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(2));
             let _ = window_clone.emit("hide-overlay", ());
+            // On Linux, truly hide the OS window after the animation
+            #[cfg(target_os = "linux")]
+            {
+                std::thread::sleep(std::time::Duration::from_millis(350));
+                let _ = window_clone.hide();
+            }
         });
     }
 }
@@ -386,6 +433,15 @@ pub fn show_tool_overlay(app_handle: &AppHandle, message: &str) {
     update_overlay_position(app_handle);
 
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
+        // On Linux, show the hidden window
+        #[cfg(target_os = "linux")]
+        {
+            let _ = overlay_window.show();
+            if let Err(e) = overlay_window.set_ignore_cursor_events(true) {
+                warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
+            }
+        }
+
         #[cfg(target_os = "linux")]
         if crate::wayland::is_wayland() {
             crate::wayland::present_gnome_overlay(&overlay_window);
@@ -408,6 +464,11 @@ pub fn show_tool_overlay(app_handle: &AppHandle, message: &str) {
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(3));
             let _ = window_clone.emit("hide-overlay", ());
+            #[cfg(target_os = "linux")]
+            {
+                std::thread::sleep(std::time::Duration::from_millis(350));
+                let _ = window_clone.hide();
+            }
         });
     }
 }
@@ -427,6 +488,11 @@ pub fn update_overlay_position(app_handle: &AppHandle) {
     }
 }
 
+#[tauri::command]
+pub fn resize_recording_overlay(app: AppHandle) {
+    update_overlay_position(&app);
+}
+
 /// Hides the recording overlay window with fade-out animation
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
     // Always hide the overlay regardless of settings - if setting was changed while recording,
@@ -434,6 +500,19 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Emit event to trigger fade-out animation (window stays visible for CSS/Framer Motion transitions)
         let _ = overlay_window.emit("hide-overlay", ());
+
+        // On Linux the overlay window must be truly hidden after the animation,
+        // because it was shown via .show() in show_recording_overlay().
+        // On macOS/Windows the window stays always-visible (React handles opacity).
+        #[cfg(target_os = "linux")]
+        {
+            let window_clone = overlay_window.clone();
+            std::thread::spawn(move || {
+                // Wait for the CSS fade-out animation to complete
+                std::thread::sleep(std::time::Duration::from_millis(350));
+                let _ = window_clone.hide();
+            });
+        }
     }
 }
 
