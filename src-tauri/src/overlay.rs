@@ -81,25 +81,47 @@ fn is_mouse_within_monitor(
         && mouse_y < (monitor_y + monitor_height as i32)
 }
 
-/// Gets the full monitor dimensions for the monitor containing the cursor
-fn get_full_screen_dimensions(app_handle: &AppHandle) -> Option<(f64, f64, f64, f64)> {
-    if let Some(monitor) = get_monitor_with_cursor(app_handle) {
-        let position = monitor.position();
-        let size = monitor.size();
-        let scale = monitor.scale_factor();
+const OVERLAY_WIDTH: f64 = 400.0;
+const OVERLAY_HEIGHT: f64 = 200.0;
 
-        let x = position.x as f64 / scale;
-        let y = position.y as f64 / scale;
-        let width = size.width as f64 / scale;
-        let height = size.height as f64 / scale;
-
-        return Some((x, y, width, height));
-    }
-    None
+/// Pure geometry computation for overlay window placement.
+/// Returns (x, y, width, height) in logical coordinates.
+fn compute_overlay_geometry(
+    mon_x: f64,
+    mon_y: f64,
+    mon_w: f64,
+    mon_h: f64,
+    position: OverlayPosition,
+) -> (f64, f64, f64, f64) {
+    let x = mon_x + (mon_w - OVERLAY_WIDTH) / 2.0;
+    let y = match position {
+        OverlayPosition::Top | OverlayPosition::None => mon_y,
+        OverlayPosition::Bottom => mon_y + mon_h - OVERLAY_HEIGHT,
+    };
+    (x, y, OVERLAY_WIDTH, OVERLAY_HEIGHT)
 }
 
-/// Creates the recording overlay window as a full-screen transparent, always-visible window.
-/// The React component initializes in its CSS-hidden state (opacity-0), so no flash occurs.
+/// Gets overlay dimensions for the monitor containing the cursor.
+fn get_overlay_dimensions(
+    app_handle: &AppHandle,
+    position: OverlayPosition,
+) -> Option<(f64, f64, f64, f64)> {
+    let monitor = get_monitor_with_cursor(app_handle)?;
+    let pos = monitor.position();
+    let size = monitor.size();
+    let scale = monitor.scale_factor();
+
+    let mon_x = pos.x as f64 / scale;
+    let mon_y = pos.y as f64 / scale;
+    let mon_w = size.width as f64 / scale;
+    let mon_h = size.height as f64 / scale;
+
+    Some(compute_overlay_geometry(mon_x, mon_y, mon_w, mon_h, position))
+}
+
+/// Creates the recording overlay window as a small transparent, always-visible window
+/// sized to fit the notch + animation padding. The React component initializes in its
+/// CSS-hidden state (opacity-0), so no flash occurs.
 /// The window must be visible from creation for `always_on_top` to work reliably on macOS.
 pub fn create_recording_overlay(app_handle: &AppHandle) {
     #[cfg(target_os = "linux")]
@@ -111,7 +133,8 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
         info!("[Overlay] Creating overlay for Wayland session");
     }
 
-    if let Some((x, y, width, height)) = get_full_screen_dimensions(app_handle) {
+    let settings = settings::get_settings(app_handle);
+    if let Some((x, y, width, height)) = get_overlay_dimensions(app_handle, settings.overlay_position) {
         info!(
             "[Overlay] Creating overlay window at ({}, {}) with size {}x{}",
             x, y, width, height
@@ -169,6 +192,27 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
                     }
                 }
 
+                // On macOS, raise the window above the menu bar so the notch
+                // can sit flush against the screen edge (y = 0). The default
+                // NSFloatingWindowLevel (3) is below the menu bar level (24).
+                #[cfg(target_os = "macos")]
+                #[allow(deprecated)]
+                {
+                    use cocoa::appkit::NSWindow;
+                    use cocoa::base::id;
+
+                    if let Ok(ns_win) = _window.ns_window() {
+                        unsafe {
+                            let window = ns_win as id;
+                            // NSStatusWindowLevel (25) — above the menu bar
+                            window.setLevel_(25);
+                            // Prevent macOS from constraining the frame below the menu bar
+                            window.setMovable_(false);
+                        }
+                        debug!("[Overlay] Set NSWindow level to NSStatusWindowLevel");
+                    }
+                }
+
                 // Window is visible from creation — enable click-through immediately
                 if let Err(e) = _window.set_ignore_cursor_events(true) {
                     warn!("[Overlay] Failed to set ignore_cursor_events: {}", e);
@@ -216,8 +260,8 @@ pub fn show_recording_overlay(app_handle: &AppHandle) {
                                     matches!(settings.overlay_position, OverlayPosition::Top);
                                 gtk_window.set_anchor(gtk_layer_shell::Edge::Top, is_top);
                                 gtk_window.set_anchor(gtk_layer_shell::Edge::Bottom, !is_top);
-                                gtk_window.set_anchor(gtk_layer_shell::Edge::Left, true);
-                                gtk_window.set_anchor(gtk_layer_shell::Edge::Right, true);
+                                gtk_window.set_anchor(gtk_layer_shell::Edge::Left, false);
+                                gtk_window.set_anchor(gtk_layer_shell::Edge::Right, false);
                                 debug!(
                                     "[Overlay] Updated layer-shell anchors for position: {:?}",
                                     settings.overlay_position
@@ -371,7 +415,10 @@ pub fn show_tool_overlay(app_handle: &AppHandle, message: &str) {
 /// Updates the overlay window position and size for the current monitor (multi-monitor support)
 pub fn update_overlay_position(app_handle: &AppHandle) {
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
-        if let Some((x, y, width, height)) = get_full_screen_dimensions(app_handle) {
+        let settings = settings::get_settings(app_handle);
+        if let Some((x, y, width, height)) =
+            get_overlay_dimensions(app_handle, settings.overlay_position)
+        {
             let _ = overlay_window
                 .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }));
             let _ =
@@ -407,5 +454,60 @@ pub fn emit_transcription_progress(app_handle: &AppHandle, text: &str) {
     // also emit to the recording overlay if it's open
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         let _ = overlay_window.emit("transcription-progress", text);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn top_position_y_is_monitor_origin() {
+        let (_, y, _, _) =
+            compute_overlay_geometry(0.0, 0.0, 1920.0, 1080.0, OverlayPosition::Top);
+        assert_eq!(y, 0.0, "Top overlay must sit at the monitor's y origin");
+    }
+
+    #[test]
+    fn bottom_position_y_is_monitor_bottom_edge() {
+        let (_, y, _, h) =
+            compute_overlay_geometry(0.0, 0.0, 1920.0, 1080.0, OverlayPosition::Bottom);
+        assert_eq!(
+            y,
+            1080.0 - h,
+            "Bottom overlay must sit flush with monitor bottom"
+        );
+    }
+
+    #[test]
+    fn horizontally_centered_on_monitor() {
+        let (x, _, w, _) =
+            compute_overlay_geometry(0.0, 0.0, 1920.0, 1080.0, OverlayPosition::Top);
+        let expected_x = (1920.0 - w) / 2.0;
+        assert_eq!(x, expected_x, "Overlay must be horizontally centered");
+    }
+
+    #[test]
+    fn respects_monitor_offset_for_secondary_display() {
+        let (x, y, _, _) =
+            compute_overlay_geometry(1920.0, 0.0, 2560.0, 1440.0, OverlayPosition::Top);
+        assert_eq!(y, 0.0, "Top overlay y must match monitor y origin");
+        let expected_x = 1920.0 + (2560.0 - OVERLAY_WIDTH) / 2.0;
+        assert_eq!(x, expected_x, "x must be offset by monitor position");
+    }
+
+    #[test]
+    fn none_position_behaves_like_top() {
+        let top = compute_overlay_geometry(0.0, 0.0, 1920.0, 1080.0, OverlayPosition::Top);
+        let none = compute_overlay_geometry(0.0, 0.0, 1920.0, 1080.0, OverlayPosition::None);
+        assert_eq!(top, none, "None position should behave identically to Top");
+    }
+
+    #[test]
+    fn returns_fixed_dimensions() {
+        let (_, _, w, h) =
+            compute_overlay_geometry(0.0, 0.0, 3840.0, 2160.0, OverlayPosition::Top);
+        assert_eq!(w, OVERLAY_WIDTH);
+        assert_eq!(h, OVERLAY_HEIGHT);
     }
 }

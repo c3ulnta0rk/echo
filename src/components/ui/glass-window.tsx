@@ -65,7 +65,7 @@ const GlassWindow = ({
     <div
       className={cn(
         "relative flex h-screen flex-col",
-        isMacos ? "bg-background/90 backdrop-blur-sm" : "bg-background",
+        isMacos ? "bg-background/93 backdrop-blur-sm" : "bg-background",
         !isWindows && "rounded-[1.125rem]",
         className
       )}

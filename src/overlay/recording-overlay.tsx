@@ -58,6 +58,7 @@ export const updateBars = (
 const RecordingOverlay = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
+  const [position, setPosition] = useState<"top" | "bottom">("top");
   const [warningMessage, setWarningMessage] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const textScrollRef = useRef<HTMLDivElement>(null);
@@ -117,8 +118,23 @@ const RecordingOverlay = () => {
         }
       );
 
+      const unlistenPosition = await listen<string>(
+        "overlay-position",
+        (event) => {
+          if (event.payload === "top" || event.payload === "bottom") {
+            setPosition(event.payload);
+          }
+        }
+      );
+
       // If cleanup already ran while we were awaiting, detach immediately
-      const fns = [unlistenShow, unlistenHide, unlistenMic, unlistenProgress];
+      const fns = [
+        unlistenShow,
+        unlistenHide,
+        unlistenMic,
+        unlistenProgress,
+        unlistenPosition,
+      ];
       if (cancelled) {
         for (const fn of fns) {
           fn();
@@ -176,8 +192,11 @@ const RecordingOverlay = () => {
   }, [isVisible]);
 
   // Fallback: listen for Escape via JavaScript keydown.
-  // On Wayland (GNOME), the global shortcut plugin (X11-based) doesn't work,
-  // but the overlay window receives focus, so keydown events reach the webview.
+  // This only works when the overlay has focus (e.g. X11 or compositors
+  // that grant focus despite accept_focus=false). On GNOME Wayland the
+  // overlay intentionally does not accept focus to avoid stealing it
+  // from the user's active application, so the global shortcut above
+  // is the primary cancel mechanism.
   useEffect(() => {
     if (!isVisible) {
       return;
@@ -204,12 +223,19 @@ const RecordingOverlay = () => {
 
   const isProcessing = state === "transcribing" && isVisible;
 
+  const isBottom = position === "bottom";
+
   return (
-    <div className="pointer-events-none fixed inset-0 flex justify-center">
-      {/* Extra top padding so the notch always feels anchored to the screen edge */}
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-0 flex justify-center",
+        isBottom && "items-end"
+      )}
+    >
       <div
         className={cn(
-          "pointer-events-auto relative flex flex-col overflow-hidden rounded-b-3xl bg-black text-white transition-[max-height] duration-300",
+          "pointer-events-auto relative flex flex-col overflow-hidden bg-black text-white transition-[max-height] duration-300",
+          isBottom ? "rounded-t-3xl" : "rounded-b-3xl",
           isVisible && "notch-show",
           !isVisible && hasBeenShown.current && "notch-hide",
           !(isVisible || hasBeenShown.current) &&
@@ -222,9 +248,17 @@ const RecordingOverlay = () => {
             hasText && isVisible
               ? `${EXPANDED_HEIGHT + TOP_OVERFLOW}px`
               : `${NOTCH_HEIGHT + TOP_OVERFLOW}px`,
-          paddingTop: `${TOP_OVERFLOW}px`,
-          marginTop: `-${TOP_OVERFLOW}px`,
-          transformOrigin: "top center",
+          ...(isBottom
+            ? {
+                paddingBottom: `${TOP_OVERFLOW}px`,
+                marginBottom: `-${TOP_OVERFLOW}px`,
+                transformOrigin: "bottom center",
+              }
+            : {
+                paddingTop: `${TOP_OVERFLOW}px`,
+                marginTop: `-${TOP_OVERFLOW}px`,
+                transformOrigin: "top center",
+              }),
           willChange: "scale, max-height",
         }}
       >

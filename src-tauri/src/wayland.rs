@@ -75,13 +75,12 @@ pub fn init_layer_shell<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), Str
     gtk_window.set_exclusive_zone(0);
     debug!("[LayerShell] Set exclusive zone to 0");
 
-    // Anchor to all edges for full-screen overlay capability
-    // The actual positioning is handled by the frontend CSS
+    // Anchor only to top edge — the compositor will center the window horizontally
     gtk_window.set_anchor(gtk_layer_shell::Edge::Top, true);
-    gtk_window.set_anchor(gtk_layer_shell::Edge::Bottom, true);
-    gtk_window.set_anchor(gtk_layer_shell::Edge::Left, true);
-    gtk_window.set_anchor(gtk_layer_shell::Edge::Right, true);
-    debug!("[LayerShell] Set anchors to all edges");
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Bottom, false);
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Left, false);
+    gtk_window.set_anchor(gtk_layer_shell::Edge::Right, false);
+    debug!("[LayerShell] Set anchor to top edge only");
 
     info!("[LayerShell] Overlay window configured successfully (will realize on first show)");
     Ok(())
@@ -95,7 +94,8 @@ pub fn init_layer_shell<R: Runtime>(_window: &WebviewWindow<R>) -> Result<(), St
 }
 
 
-/// Configure GNOME overlay fallback (set_keep_above) without presenting/showing.
+/// Configure GNOME overlay fallback without presenting/showing.
+/// Applies the focus policy so the overlay never steals focus from the user's app.
 /// Should be called during window creation.
 #[cfg(target_os = "linux")]
 pub fn configure_gnome_overlay<R: Runtime>(window: &WebviewWindow<R>) {
@@ -109,13 +109,17 @@ pub fn configure_gnome_overlay<R: Runtime>(window: &WebviewWindow<R>) {
         }
     };
 
-    // set_keep_above is a GTK3 API that Mutter respects more reliably
-    // than Tauri's always_on_top abstraction on Wayland
-    info!("[Wayland] Configuring GNOME overlay fallback (set_keep_above)");
-    gtk_window.set_keep_above(true);
+    let policy = gnome_overlay_focus_policy();
+
+    info!("[Wayland] Configuring GNOME overlay fallback (keep_above, no focus)");
+    gtk_window.set_keep_above(policy.keep_above);
+    gtk_window.set_accept_focus(policy.accept_focus);
+    gtk_window.set_focus_on_map(policy.focus_on_map);
+    debug!("[Wayland] Set accept_focus={}, focus_on_map={}", policy.accept_focus, policy.focus_on_map);
 }
 
 /// Bring an overlay window to the front on GNOME Wayland using GTK-level APIs.
+/// Uses `show()` instead of `present()` to avoid stealing keyboard focus.
 /// Should be called every time the window is shown.
 #[cfg(target_os = "linux")]
 pub fn present_gnome_overlay<R: Runtime>(window: &WebviewWindow<R>) {
@@ -129,16 +133,17 @@ pub fn present_gnome_overlay<R: Runtime>(window: &WebviewWindow<R>) {
         }
     };
 
-    info!("[Wayland] Presenting GNOME overlay (set_keep_above + present + set_visible)");
+    let policy = gnome_overlay_focus_policy();
 
-    // re-apply keep above just in case
-    gtk_window.set_keep_above(true);
+    info!("[Wayland] Showing GNOME overlay (set_keep_above, no focus steal)");
 
-    // present() requests the compositor to bring this window to front
-    gtk_window.present();
+    gtk_window.set_keep_above(policy.keep_above);
+    gtk_window.set_accept_focus(policy.accept_focus);
+    gtk_window.set_focus_on_map(policy.focus_on_map);
 
-    // Explicitly ensure visibility via GTK
-    gtk_window.set_visible(true);
+    // show() makes the window visible without stealing focus,
+    // unlike present() which would grab keyboard focus
+    gtk_window.show();
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -151,4 +156,70 @@ pub fn configure_gnome_overlay<R: Runtime>(_window: &WebviewWindow<R>) {
 #[allow(dead_code)]
 pub fn present_gnome_overlay<R: Runtime>(_window: &WebviewWindow<R>) {
     // No-op
+}
+
+/// Describes the focus policy for a GNOME overlay window.
+/// Extracted so the configuration decisions can be tested on any platform.
+#[derive(Debug, PartialEq)]
+pub struct GnomeOverlayFocusPolicy {
+    /// Whether the window should accept keyboard focus
+    pub accept_focus: bool,
+    /// Whether the window should grab focus when first mapped
+    pub focus_on_map: bool,
+    /// Whether to call `present()` (which steals focus) vs just `show()`
+    pub use_present: bool,
+    /// Whether to set keep_above (always on top)
+    pub keep_above: bool,
+}
+
+/// Returns the focus policy for a GNOME overlay window.
+/// The overlay must never steal focus from the user's active application.
+pub fn gnome_overlay_focus_policy() -> GnomeOverlayFocusPolicy {
+    GnomeOverlayFocusPolicy {
+        accept_focus: false,
+        focus_on_map: false,
+        use_present: false,
+        keep_above: true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gnome_overlay_must_not_accept_focus() {
+        let policy = gnome_overlay_focus_policy();
+        assert!(
+            !policy.accept_focus,
+            "Overlay must not accept keyboard focus — it would steal focus from the user's app"
+        );
+    }
+
+    #[test]
+    fn gnome_overlay_must_not_focus_on_map() {
+        let policy = gnome_overlay_focus_policy();
+        assert!(
+            !policy.focus_on_map,
+            "Overlay must not grab focus when mapped — it would interrupt the user"
+        );
+    }
+
+    #[test]
+    fn gnome_overlay_must_not_use_present() {
+        let policy = gnome_overlay_focus_policy();
+        assert!(
+            !policy.use_present,
+            "present() steals focus on GNOME — use show()/set_visible instead"
+        );
+    }
+
+    #[test]
+    fn gnome_overlay_must_stay_on_top() {
+        let policy = gnome_overlay_focus_policy();
+        assert!(
+            policy.keep_above,
+            "Overlay must be kept above other windows"
+        );
+    }
 }
