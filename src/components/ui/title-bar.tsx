@@ -2,11 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Minus, Square, X } from "lucide-react";
-import type {
-  ComponentPropsWithoutRef,
-  CSSProperties,
-  MouseEvent,
-} from "react";
+import type { ComponentPropsWithoutRef, MouseEvent } from "react";
 import { getNormalizedOsPlatform } from "@/lib/os";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +11,6 @@ const TITLEBAR_HEIGHT = "2rem";
 // Cache platform at module level to avoid repeated calls
 const platform = getNormalizedOsPlatform();
 const isMacOS = platform === "mac";
-const isWindows = platform === "windows";
 
 const windowControlVariants = cva(
   "inline-flex cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -78,10 +73,6 @@ const TitleBar = ({
         className={cn("h-8 shrink-0 bg-transparent! pl-4", className)}
         data-tauri-drag-region
         ref={ref}
-        style={{
-          borderTopLeftRadius: "var(--window-radius)",
-          borderTopRightRadius: "var(--window-radius)",
-        }}
         {...props}
       />
     );
@@ -125,18 +116,9 @@ const TitleBar = ({
       )}
       data-tauri-drag-region
       ref={ref}
-      style={
-        {
-          "--titlebar-height": TITLEBAR_HEIGHT,
-          height: "var(--titlebar-height)",
-          ...(isWindows
-            ? {}
-            : {
-                borderTopLeftRadius: "var(--window-radius)",
-                borderTopRightRadius: "var(--window-radius)",
-              }),
-        } as CSSProperties
-      }
+      style={{
+        height: TITLEBAR_HEIGHT,
+      }}
       {...props}
     >
       <WindowControlButton onClick={handleMinimize} type="button">

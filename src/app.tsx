@@ -18,6 +18,7 @@ import {
 import { TranscriptionResultDialog } from "./components/transcription-result-dialog";
 import { TitleBar } from "./components/ui/title-bar";
 import { useFileTranscriptionListener } from "./hooks/use-file-transcription-listener";
+import { useMeetingListener } from "./hooks/use-meeting-listener";
 import { useSetting, useSettingsStore } from "./stores/settings-store";
 
 const renderSettingsContent = (section: SidebarSection) => {
@@ -37,6 +38,7 @@ function App() {
   const hasSignaledReady = useRef(false);
 
   useFileTranscriptionListener();
+  useMeetingListener();
 
   // Initialize settings store — this is the root component
   useEffect(() => {

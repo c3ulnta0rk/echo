@@ -1,5 +1,6 @@
 use crate::settings;
 use anyhow::Result;
+use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,7 @@ use tauri::{AppHandle, Emitter, Manager};
 pub enum EngineType {
     Whisper,
     Parakeet,
+    Diarization,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,6 +183,45 @@ impl ModelManager {
             },
         );
 
+        // Diarization models (speaker segmentation + embedding)
+        available_models.insert(
+            "diarization-segmentation".to_string(),
+            ModelInfo {
+                id: "diarization-segmentation".to_string(),
+                name: "Speaker Segmentation".to_string(),
+                description: "Identifies when different speakers are talking".to_string(),
+                filename: "sherpa-onnx-pyannote-segmentation-3-0".to_string(),
+                url: Some("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2".to_string()),
+                size_mb: 6,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: true,
+                engine_type: EngineType::Diarization,
+                accuracy_score: 0.0,
+                speed_score: 0.0,
+            },
+        );
+
+        available_models.insert(
+            "diarization-embedding".to_string(),
+            ModelInfo {
+                id: "diarization-embedding".to_string(),
+                name: "Speaker Embedding".to_string(),
+                description: "Creates voice signatures to distinguish speakers".to_string(),
+                filename: "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx".to_string(),
+                url: Some("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx".to_string()),
+                size_mb: 70,
+                is_downloaded: false,
+                is_downloading: false,
+                partial_size: 0,
+                is_directory: false,
+                engine_type: EngineType::Diarization,
+                accuracy_score: 0.0,
+                speed_score: 0.0,
+            },
+        );
+
         let manager = Self {
             app_handle: app_handle.clone(),
             models_dir,
@@ -202,6 +243,15 @@ impl ModelManager {
     pub fn get_available_models(&self) -> Vec<ModelInfo> {
         let models = self.available_models.lock().unwrap();
         models.values().cloned().collect()
+    }
+
+    pub fn get_transcription_models(&self) -> Vec<ModelInfo> {
+        let models = self.available_models.lock().unwrap();
+        models
+            .values()
+            .filter(|m| !matches!(m.engine_type, EngineType::Diarization))
+            .cloned()
+            .collect()
     }
 
     pub fn get_model_info(&self, model_id: &str) -> Option<ModelInfo> {
@@ -289,9 +339,12 @@ impl ModelManager {
 
         // If no model is selected or selected model is empty
         if current.selected_model.is_empty() {
-            // Find the first available (downloaded) model
+            // Find the first available (downloaded) transcription model
             let models = self.available_models.lock().unwrap();
-            if let Some(available_model) = models.values().find(|model| model.is_downloaded) {
+            if let Some(available_model) = models
+                .values()
+                .find(|model| model.is_downloaded && !matches!(model.engine_type, EngineType::Diarization))
+            {
                 log::info!(
                     "Auto-selecting model: {} ({})",
                     available_model.id,
@@ -474,25 +527,41 @@ impl ModelManager {
             // Create temporary extraction directory
             fs::create_dir_all(&temp_extract_dir)?;
 
-            // Open the downloaded tar.gz file
-            let tar_gz = File::open(&partial_path)?;
-            let tar = GzDecoder::new(tar_gz);
-            let mut archive = Archive::new(tar);
+            // Open the downloaded archive file (supports .tar.gz and .tar.bz2)
+            let archive_file = File::open(&partial_path)?;
+            let is_bz2 = url.ends_with(".tar.bz2") || url.ends_with(".tbz2");
 
-            // Extract to the temporary directory first
-            archive.unpack(&temp_extract_dir).map_err(|e| {
-                let error_msg = format!("Failed to extract archive: {}", e);
-                // Clean up failed extraction
-                let _ = fs::remove_dir_all(&temp_extract_dir);
-                let _ = self.app_handle.emit(
-                    "model-extraction-failed",
-                    &serde_json::json!({
-                        "model_id": model_id,
-                        "error": error_msg
-                    }),
-                );
-                anyhow::anyhow!(error_msg)
-            })?;
+            if is_bz2 {
+                let decoder = BzDecoder::new(archive_file);
+                let mut archive = Archive::new(decoder);
+                archive.unpack(&temp_extract_dir).map_err(|e| {
+                    let error_msg = format!("Failed to extract archive: {}", e);
+                    let _ = fs::remove_dir_all(&temp_extract_dir);
+                    let _ = self.app_handle.emit(
+                        "model-extraction-failed",
+                        &serde_json::json!({
+                            "model_id": model_id,
+                            "error": error_msg
+                        }),
+                    );
+                    anyhow::anyhow!(error_msg)
+                })?;
+            } else {
+                let decoder = GzDecoder::new(archive_file);
+                let mut archive = Archive::new(decoder);
+                archive.unpack(&temp_extract_dir).map_err(|e| {
+                    let error_msg = format!("Failed to extract archive: {}", e);
+                    let _ = fs::remove_dir_all(&temp_extract_dir);
+                    let _ = self.app_handle.emit(
+                        "model-extraction-failed",
+                        &serde_json::json!({
+                            "model_id": model_id,
+                            "error": error_msg
+                        }),
+                    );
+                    anyhow::anyhow!(error_msg)
+                })?;
+            }
 
             // Find the actual extracted directory (archive might have a nested structure)
             let extracted_dirs: Vec<_> = fs::read_dir(&temp_extract_dir)?

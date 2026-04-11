@@ -247,6 +247,18 @@ pub struct AppSettings {
     pub input_tracking_idle_timeout: Option<u64>,
     #[serde(default)]
     pub tts_enabled: bool,
+    #[serde(default)]
+    pub meeting_system_audio_enabled: bool,
+    #[serde(default)]
+    pub meeting_system_audio_device: Option<String>,
+    #[serde(default)]
+    pub meeting_auto_summary: bool,
+    #[serde(default = "default_meeting_chunk_duration_secs")]
+    pub meeting_chunk_duration_secs: u32,
+    #[serde(default)]
+    pub meeting_diarization_enabled: bool,
+    #[serde(default = "default_diarization_threshold")]
+    pub meeting_diarization_threshold: f32,
 }
 
 fn default_audio_feedback_volume() -> f32 {
@@ -310,6 +322,14 @@ fn default_input_tracking_idle_timeout() -> Option<u64> {
 
 fn default_voice_commands_enabled() -> bool {
     true
+}
+
+fn default_meeting_chunk_duration_secs() -> u32 {
+    30
+}
+
+fn default_diarization_threshold() -> f32 {
+    0.5
 }
 
 fn default_post_process_provider_id() -> String {
@@ -476,6 +496,12 @@ pub fn get_default_settings() -> AppSettings {
         input_tracking_excluded_apps: Vec::new(),
         input_tracking_idle_timeout: default_input_tracking_idle_timeout(),
         tts_enabled: false,
+        meeting_system_audio_enabled: false,
+        meeting_system_audio_device: None,
+        meeting_auto_summary: false,
+        meeting_chunk_duration_secs: default_meeting_chunk_duration_secs(),
+        meeting_diarization_enabled: false,
+        meeting_diarization_threshold: default_diarization_threshold(),
     }
 }
 

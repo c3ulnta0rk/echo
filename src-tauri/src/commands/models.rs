@@ -8,7 +8,7 @@ use tauri::{AppHandle, State};
 pub async fn get_available_models(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<Vec<ModelInfo>, String> {
-    Ok(model_manager.get_available_models())
+    Ok(model_manager.get_transcription_models())
 }
 
 #[tauri::command]
@@ -96,7 +96,7 @@ pub async fn is_model_loading(
 pub async fn has_any_models_available(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
-    let models = model_manager.get_available_models();
+    let models = model_manager.get_transcription_models();
     Ok(models.iter().any(|m| m.is_downloaded))
 }
 
@@ -104,7 +104,7 @@ pub async fn has_any_models_available(
 pub async fn has_any_models_or_downloads(
     model_manager: State<'_, Arc<ModelManager>>,
 ) -> Result<bool, String> {
-    let models = model_manager.get_available_models();
+    let models = model_manager.get_transcription_models();
     // Return true if any models are downloaded OR if any downloads are in progress
     Ok(models.iter().any(|m| m.is_downloaded))
 }

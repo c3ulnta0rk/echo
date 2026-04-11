@@ -2,6 +2,7 @@ pub mod audio;
 pub mod file_transcription;
 pub mod history;
 pub mod input_tracking;
+pub mod meeting;
 pub mod models;
 pub mod transcription;
 pub mod tts;

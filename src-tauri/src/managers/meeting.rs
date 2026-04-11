@@ -1,0 +1,1330 @@
+//! Meeting transcription manager.
+//!
+//! Orchestrates dual-stream recording (mic + system audio), chunked transcription,
+//! speaker labeling, and meeting lifecycle management.
+
+use anyhow::{Context, Result};
+use chrono::Utc;
+use log::{debug, error, info, warn};
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::Mutex;
+
+use super::database;
+use super::diarization::DiarizationManager;
+use super::transcription::TranscriptionManager;
+use crate::audio_toolkit::audio::save_wav_file;
+use crate::audio_toolkit::{list_input_devices, AudioRecorder};
+use crate::helpers::clamshell;
+use crate::settings;
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MeetingStatus {
+    Recording,
+    Processing,
+    Complete,
+    Error,
+}
+
+impl MeetingStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MeetingStatus::Recording => "recording",
+            MeetingStatus::Processing => "processing",
+            MeetingStatus::Complete => "complete",
+            MeetingStatus::Error => "error",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "recording" => MeetingStatus::Recording,
+            "processing" => MeetingStatus::Processing,
+            "complete" => MeetingStatus::Complete,
+            "error" => MeetingStatus::Error,
+            _ => MeetingStatus::Error,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioSource {
+    Mic,
+    System,
+}
+
+impl AudioSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AudioSource::Mic => "mic",
+            AudioSource::System => "system",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Meeting {
+    pub id: i64,
+    pub title: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub duration_ms: Option<i64>,
+    pub mic_file_name: Option<String>,
+    pub system_file_name: Option<String>,
+    pub summary: Option<String>,
+    pub status: MeetingStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeetingSegment {
+    pub id: i64,
+    pub meeting_id: i64,
+    pub speaker_label: String,
+    pub start_ms: i64,
+    pub end_ms: i64,
+    pub text: String,
+    pub confidence: Option<f64>,
+    pub audio_source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    Srt,
+    Vtt,
+    Txt,
+    Markdown,
+}
+
+// ── Internal recording state ───────────────────────────────────────────────
+
+struct RecordingState {
+    meeting_id: i64,
+    start_time: i64,
+}
+
+enum ManagerState {
+    Idle,
+    Recording(RecordingState),
+    Processing,
+}
+
+// ── Manager ────────────────────────────────────────────────────────────────
+
+pub struct MeetingManager {
+    app_handle: AppHandle,
+    state: Arc<Mutex<ManagerState>>,
+    meetings_dir: PathBuf,
+    db_path: PathBuf,
+    /// Dedicated mic recorder for meeting capture (no VAD — records everything).
+    mic_recorder: Arc<std::sync::Mutex<Option<AudioRecorder>>>,
+}
+
+impl MeetingManager {
+    pub fn new(app_handle: &AppHandle) -> Result<Self> {
+        let app_data_dir = app_handle.path().app_data_dir()?;
+        let meetings_dir = app_data_dir.join("meetings");
+        let db_path = app_data_dir.join("history.db");
+
+        if !meetings_dir.exists() {
+            fs::create_dir_all(&meetings_dir)?;
+            debug!("Created meetings directory: {:?}", meetings_dir);
+        }
+
+        // Ensure the meetings tables exist (database::initialize_database is already called
+        // by HistoryManager, but we verify our tables are present)
+        database::initialize_database(&db_path)
+            .context("Failed to initialize database for meetings")?;
+
+        Ok(Self {
+            app_handle: app_handle.clone(),
+            state: Arc::new(Mutex::new(ManagerState::Idle)),
+            meetings_dir,
+            db_path,
+            mic_recorder: Arc::new(std::sync::Mutex::new(None)),
+        })
+    }
+
+    fn get_connection(&self) -> Result<Connection> {
+        let conn = Connection::open(&self.db_path)
+            .with_context(|| format!("Failed to open database at {:?}", self.db_path))?;
+        conn.execute_batch("PRAGMA foreign_keys = ON;")
+            .context("Failed to enable foreign keys")?;
+        Ok(conn)
+    }
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+
+    /// Resolve the microphone device from settings (respects clamshell mode).
+    fn get_effective_mic_device(&self) -> Option<cpal::Device> {
+        let app_settings = settings::get_settings(&self.app_handle);
+
+        let should_use_clamshell = if app_settings.clamshell_microphone.is_some() {
+            clamshell::is_clamshell().unwrap_or(false)
+        } else {
+            false
+        };
+
+        let device_name = if should_use_clamshell {
+            app_settings.clamshell_microphone.as_deref()
+        } else {
+            app_settings.selected_microphone.as_deref()
+        }?;
+
+        match list_input_devices() {
+            Ok(devices) => devices
+                .into_iter()
+                .find(|d| d.name == device_name)
+                .map(|d| d.device),
+            Err(e) => {
+                debug!("Failed to list devices, using default: {}", e);
+                None
+            }
+        }
+    }
+
+    /// Start a new meeting recording.
+    pub async fn start_meeting(&self, title: Option<String>) -> Result<i64> {
+        let mut state = self.state.lock().await;
+        if !matches!(*state, ManagerState::Idle) {
+            anyhow::bail!("A meeting is already in progress");
+        }
+
+        // Open mic recorder (no VAD — meetings should capture all audio)
+        let mut recorder = AudioRecorder::new()
+            .map_err(|e| anyhow::anyhow!("Failed to create meeting audio recorder: {}", e))?;
+
+        let selected_device = self.get_effective_mic_device();
+        recorder
+            .open(selected_device)
+            .map_err(|e| anyhow::anyhow!("Failed to open microphone for meeting: {}", e))?;
+
+        recorder
+            .start(None)
+            .map_err(|e| anyhow::anyhow!("Failed to start microphone recording: {}", e))?;
+
+        info!("Meeting microphone stream started");
+
+        {
+            let mut rec_guard = self.mic_recorder.lock().unwrap();
+            *rec_guard = Some(recorder);
+        }
+
+        let now = Utc::now().timestamp();
+        let meeting_title = title.unwrap_or_else(|| {
+            let dt = chrono::Local::now();
+            format!("Meeting {}", dt.format("%b %d, %H:%M"))
+        });
+
+        let conn = self.get_connection()?;
+        conn.execute(
+            "INSERT INTO meetings (title, start_time, status) VALUES (?1, ?2, ?3)",
+            params![meeting_title, now, MeetingStatus::Recording.as_str()],
+        )?;
+        let meeting_id = conn.last_insert_rowid();
+
+        info!("Started meeting {} (id={})", meeting_title, meeting_id);
+
+        *state = ManagerState::Recording(RecordingState {
+            meeting_id,
+            start_time: now,
+        });
+
+        self.emit_status_changed(MeetingStatus::Recording);
+
+        Ok(meeting_id)
+    }
+
+    /// Stop the current meeting recording, save audio, and set status to Processing.
+    pub async fn stop_meeting(&self) -> Result<()> {
+        let recording = {
+            let mut state = self.state.lock().await;
+            match std::mem::replace(&mut *state, ManagerState::Processing) {
+                ManagerState::Recording(rs) => rs,
+                other => {
+                    *state = other;
+                    anyhow::bail!("No meeting is currently recording");
+                }
+            }
+        };
+
+        self.emit_status_changed(MeetingStatus::Processing);
+
+        // Stop the mic recorder and collect all accumulated samples
+        let mic_samples = {
+            let rec_guard = self.mic_recorder.lock().unwrap();
+            if let Some(ref recorder) = *rec_guard {
+                match recorder.stop() {
+                    Ok(samples) => {
+                        info!(
+                            "Meeting mic captured {} samples ({:.1}s)",
+                            samples.len(),
+                            samples.len() as f32 / 16000.0
+                        );
+                        samples
+                    }
+                    Err(e) => {
+                        error!("Failed to stop meeting mic recorder: {}", e);
+                        Vec::new()
+                    }
+                }
+            } else {
+                warn!("No mic recorder was active for meeting");
+                Vec::new()
+            }
+        };
+
+        // Close and drop the recorder
+        {
+            let mut rec_guard = self.mic_recorder.lock().unwrap();
+            if let Some(mut recorder) = rec_guard.take() {
+                let _ = recorder.close();
+            }
+        }
+
+        let now = Utc::now().timestamp();
+        let duration_ms = (now - recording.start_time) * 1000;
+        let meeting_id = recording.meeting_id;
+
+        // Save mic audio to WAV
+        let mic_file = if !mic_samples.is_empty() {
+            let name = format!("meeting-{}-mic.wav", meeting_id);
+            let path = self.meetings_dir.join(&name);
+            save_wav_file(path, &mic_samples).await?;
+            Some(name)
+        } else {
+            None
+        };
+
+        // System audio not yet wired — placeholder for future implementation
+        let sys_file: Option<String> = None;
+
+        // Update meeting record
+        let conn = self.get_connection()?;
+        conn.execute(
+            "UPDATE meetings SET end_time = ?1, duration_ms = ?2, mic_file_name = ?3, system_file_name = ?4, status = ?5 WHERE id = ?6",
+            params![
+                now,
+                duration_ms,
+                mic_file,
+                sys_file,
+                MeetingStatus::Processing.as_str(),
+                meeting_id,
+            ],
+        )?;
+
+        // Transcribe mic audio — with or without speaker diarization
+        if !mic_samples.is_empty() {
+            let app_settings = settings::get_settings(&self.app_handle);
+            let diarization_available = self
+                .app_handle
+                .try_state::<Arc<DiarizationManager>>()
+                .map(|dm| dm.is_available())
+                .unwrap_or(false);
+
+            if app_settings.meeting_diarization_enabled && diarization_available {
+                self.diarize_and_transcribe(meeting_id, &mic_samples, AudioSource::Mic)
+                    .await;
+            } else {
+                self.transcribe_samples(meeting_id, &mic_samples, "Speaker", AudioSource::Mic)
+                    .await;
+            }
+        }
+
+        // Mark complete
+        conn.execute(
+            "UPDATE meetings SET status = ?1 WHERE id = ?2",
+            params![MeetingStatus::Complete.as_str(), meeting_id],
+        )?;
+
+        let mut state = self.state.lock().await;
+        *state = ManagerState::Idle;
+
+        self.emit_status_changed(MeetingStatus::Complete);
+        info!("Meeting {} completed", meeting_id);
+
+        // Auto-generate summary if enabled
+        let app_settings = settings::get_settings(&self.app_handle);
+        if app_settings.meeting_auto_summary {
+            if let Err(e) = self.generate_summary(meeting_id).await {
+                warn!("Failed to auto-generate meeting summary: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Transcribe audio samples in chunks and insert segments into the database.
+    async fn transcribe_samples(
+        &self,
+        meeting_id: i64,
+        samples: &[f32],
+        speaker_label: &str,
+        source: AudioSource,
+    ) {
+        let chunk_secs = {
+            let s = settings::get_settings(&self.app_handle);
+            s.meeting_chunk_duration_secs.max(10) as usize
+        };
+        let chunk_size = chunk_secs * 16_000; // 16kHz mono
+        let overlap_size = 5 * 16_000; // 5s overlap
+
+        let transcription_manager = self.app_handle.state::<Arc<TranscriptionManager>>();
+
+        // Ensure the transcription model is loaded before we start chunking
+        transcription_manager.initiate_model_load();
+
+        let mut offset_ms: i64 = 0;
+        let mut pos = 0;
+
+        while pos < samples.len() {
+            let end = (pos + chunk_size).min(samples.len());
+            let chunk = &samples[pos..end];
+
+            match transcription_manager.transcribe(chunk.to_vec()) {
+                Ok(text) if !text.trim().is_empty() => {
+                    let chunk_duration_ms = ((end - pos) as i64 * 1000) / 16_000;
+                    let segment = MeetingSegment {
+                        id: 0,
+                        meeting_id,
+                        speaker_label: speaker_label.to_string(),
+                        start_ms: offset_ms,
+                        end_ms: offset_ms + chunk_duration_ms,
+                        text: text.trim().to_string(),
+                        confidence: None,
+                        audio_source: source.as_str().to_string(),
+                    };
+                    if let Err(e) = self.insert_segment(&segment) {
+                        error!("Failed to insert meeting segment: {}", e);
+                    } else {
+                        let _ = self.app_handle.emit("meeting-segment-added", &segment);
+                    }
+                }
+                Ok(_) => {
+                    debug!("Empty transcription for chunk at {}ms", offset_ms);
+                }
+                Err(e) => {
+                    error!("Failed to transcribe meeting chunk at {}ms: {}", offset_ms, e);
+                }
+            }
+
+            let step = if end < samples.len() {
+                chunk_size.saturating_sub(overlap_size)
+            } else {
+                end - pos
+            };
+            offset_ms += (step as i64 * 1000) / 16_000;
+            pos += step;
+        }
+    }
+
+    /// Run speaker diarization on the full audio, then transcribe each speaker segment.
+    /// Falls back to chunked transcription on failure.
+    async fn diarize_and_transcribe(
+        &self,
+        meeting_id: i64,
+        samples: &[f32],
+        source: AudioSource,
+    ) {
+        let diarization_manager = match self.app_handle.try_state::<Arc<DiarizationManager>>() {
+            Some(dm) => dm.inner().clone(),
+            None => {
+                warn!("DiarizationManager not available, falling back to chunked transcription");
+                self.transcribe_samples(meeting_id, samples, "Speaker", source)
+                    .await;
+                return;
+            }
+        };
+
+        let threshold = {
+            let s = settings::get_settings(&self.app_handle);
+            s.meeting_diarization_threshold
+        };
+
+        let diarization_result = diarization_manager.diarize(samples, threshold);
+
+        let raw_segments = match diarization_result {
+            Ok(segs) => segs,
+            Err(e) => {
+                error!("Diarization failed, falling back to chunked transcription: {}", e);
+                self.transcribe_samples(meeting_id, samples, "Speaker", source)
+                    .await;
+                return;
+            }
+        };
+
+        if raw_segments.is_empty() {
+            warn!("Diarization returned no segments, falling back to chunked transcription");
+            self.transcribe_samples(meeting_id, samples, "Speaker", source)
+                .await;
+            return;
+        }
+
+        // Merge consecutive same-speaker segments (max 30s for transcription context)
+        let merged = DiarizationManager::merge_consecutive(&raw_segments, 30_000);
+
+        let transcription_manager = self.app_handle.state::<Arc<TranscriptionManager>>();
+        transcription_manager.initiate_model_load();
+
+        let sample_rate: i64 = 16_000;
+        let min_samples: usize = 1600; // 100ms minimum
+
+        for seg in &merged {
+            let start_sample = (seg.start_ms * sample_rate / 1000) as usize;
+            let end_sample = ((seg.end_ms * sample_rate / 1000) as usize).min(samples.len());
+
+            if end_sample <= start_sample || (end_sample - start_sample) < min_samples {
+                continue;
+            }
+
+            let chunk = &samples[start_sample..end_sample];
+
+            match transcription_manager.transcribe(chunk.to_vec()) {
+                Ok(text) if !text.trim().is_empty() => {
+                    let segment = MeetingSegment {
+                        id: 0,
+                        meeting_id,
+                        speaker_label: format!("Speaker {}", seg.speaker_id),
+                        start_ms: seg.start_ms,
+                        end_ms: seg.end_ms,
+                        text: text.trim().to_string(),
+                        confidence: None,
+                        audio_source: source.as_str().to_string(),
+                    };
+                    if let Err(e) = self.insert_segment(&segment) {
+                        error!("Failed to insert diarized segment: {}", e);
+                    } else {
+                        let _ = self.app_handle.emit("meeting-segment-added", &segment);
+                    }
+                }
+                Ok(_) => {
+                    debug!(
+                        "Empty transcription for diarized segment at {}ms",
+                        seg.start_ms
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to transcribe diarized segment at {}ms: {}",
+                        seg.start_ms, e
+                    );
+                }
+            }
+        }
+
+        info!(
+            "Diarized transcription complete: {} segments from {} merged speaker segments",
+            merged.len(),
+            raw_segments.len()
+        );
+    }
+
+    fn insert_segment(&self, segment: &MeetingSegment) -> Result<()> {
+        let conn = self.get_connection()?;
+        conn.execute(
+            "INSERT INTO meeting_segments (meeting_id, speaker_label, start_ms, end_ms, text, confidence, audio_source) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                segment.meeting_id,
+                segment.speaker_label,
+                segment.start_ms,
+                segment.end_ms,
+                segment.text,
+                segment.confidence,
+                segment.audio_source,
+            ],
+        )?;
+        Ok(())
+    }
+
+    // ── Queries ────────────────────────────────────────────────────────────
+
+    pub fn get_meeting_status(&self) -> MeetingStatus {
+        // Use try_lock to avoid blocking — returns Idle if locked (recording in progress returns Recording via DB)
+        match self.state.try_lock() {
+            Ok(state) => match &*state {
+                ManagerState::Idle => MeetingStatus::Complete,
+                ManagerState::Recording(_) => MeetingStatus::Recording,
+                ManagerState::Processing => MeetingStatus::Processing,
+            },
+            Err(_) => MeetingStatus::Recording,
+        }
+    }
+
+    pub fn get_meeting(&self, id: i64) -> Result<Meeting> {
+        let conn = self.get_connection()?;
+        conn.query_row(
+            "SELECT id, title, start_time, end_time, duration_ms, mic_file_name, system_file_name, summary, status FROM meetings WHERE id = ?1",
+            params![id],
+            |row| {
+                let status_str: String = row.get(8)?;
+                Ok(Meeting {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    start_time: row.get(2)?,
+                    end_time: row.get(3)?,
+                    duration_ms: row.get(4)?,
+                    mic_file_name: row.get(5)?,
+                    system_file_name: row.get(6)?,
+                    summary: row.get(7)?,
+                    status: MeetingStatus::from_str(&status_str),
+                })
+            },
+        )
+        .context("Meeting not found")
+    }
+
+    pub fn get_meeting_segments(&self, meeting_id: i64) -> Result<Vec<MeetingSegment>> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, meeting_id, speaker_label, start_ms, end_ms, text, confidence, audio_source FROM meeting_segments WHERE meeting_id = ?1 ORDER BY start_ms ASC",
+        )?;
+        let segments = stmt
+            .query_map(params![meeting_id], |row| {
+                Ok(MeetingSegment {
+                    id: row.get(0)?,
+                    meeting_id: row.get(1)?,
+                    speaker_label: row.get(2)?,
+                    start_ms: row.get(3)?,
+                    end_ms: row.get(4)?,
+                    text: row.get(5)?,
+                    confidence: row.get(6)?,
+                    audio_source: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .context("Failed to query meeting segments")?;
+        Ok(segments)
+    }
+
+    pub fn list_meetings(&self) -> Result<Vec<Meeting>> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, title, start_time, end_time, duration_ms, mic_file_name, system_file_name, summary, status FROM meetings ORDER BY start_time DESC",
+        )?;
+        let meetings = stmt
+            .query_map([], |row| {
+                let status_str: String = row.get(8)?;
+                Ok(Meeting {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    start_time: row.get(2)?,
+                    end_time: row.get(3)?,
+                    duration_ms: row.get(4)?,
+                    mic_file_name: row.get(5)?,
+                    system_file_name: row.get(6)?,
+                    summary: row.get(7)?,
+                    status: MeetingStatus::from_str(&status_str),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .context("Failed to query meetings")?;
+        Ok(meetings)
+    }
+
+    pub fn delete_meeting(&self, id: i64) -> Result<()> {
+        // Delete associated audio files first
+        let conn = self.get_connection()?;
+        let meeting = self.get_meeting(id)?;
+
+        if let Some(ref name) = meeting.mic_file_name {
+            let path = self.meetings_dir.join(name);
+            if path.exists() {
+                let _ = fs::remove_file(&path);
+            }
+        }
+        if let Some(ref name) = meeting.system_file_name {
+            let path = self.meetings_dir.join(name);
+            if path.exists() {
+                let _ = fs::remove_file(&path);
+            }
+        }
+
+        // CASCADE will also delete meeting_segments
+        conn.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
+        info!("Deleted meeting {}", id);
+        Ok(())
+    }
+
+    pub fn rename_speaker(
+        &self,
+        meeting_id: i64,
+        old_label: &str,
+        new_label: &str,
+    ) -> Result<()> {
+        let conn = self.get_connection()?;
+        conn.execute(
+            "UPDATE meeting_segments SET speaker_label = ?1 WHERE meeting_id = ?2 AND speaker_label = ?3",
+            params![new_label, meeting_id, old_label],
+        )?;
+        info!(
+            "Renamed speaker '{}' to '{}' in meeting {}",
+            old_label, new_label, meeting_id
+        );
+        Ok(())
+    }
+
+    // ── Summary ────────────────────────────────────────────────────────────
+
+    pub async fn generate_summary(&self, meeting_id: i64) -> Result<String> {
+        let segments = self.get_meeting_segments(meeting_id)?;
+        if segments.is_empty() {
+            anyhow::bail!("No segments to summarize");
+        }
+
+        let transcript = segments
+            .iter()
+            .map(|s| {
+                let time = format_ms_to_hms(s.start_ms);
+                format!("[{}] {}: {}", time, s.speaker_label, s.text)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let app_settings = settings::get_settings(&self.app_handle);
+
+        let provider = app_settings
+            .active_post_process_provider()
+            .ok_or_else(|| anyhow::anyhow!("No post-processing provider configured"))?
+            .clone();
+
+        let api_key = app_settings
+            .post_process_api_keys
+            .get(&provider.id)
+            .cloned()
+            .unwrap_or_default();
+
+        let model = app_settings
+            .post_process_models
+            .get(&provider.id)
+            .cloned()
+            .unwrap_or_default();
+
+        if model.is_empty() {
+            anyhow::bail!("No post-processing model configured");
+        }
+
+        let client = crate::llm_client::create_client(&provider, api_key)
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        let prompt = format!(
+            "Summarize this meeting transcript. Include:\n\
+             1. Key topics discussed\n\
+             2. Decisions made\n\
+             3. Action items with assignees\n\
+             4. Important dates/deadlines mentioned\n\n\
+             Transcript:\n{}",
+            transcript
+        );
+
+        use async_openai::types::{
+            ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+            CreateChatCompletionRequestArgs,
+        };
+
+        let request = CreateChatCompletionRequestArgs::default()
+            .model(&model)
+            .messages(vec![
+                ChatCompletionRequestSystemMessageArgs::default()
+                    .content("You are a meeting summary assistant. Produce concise, actionable summaries.")
+                    .build()
+                    .map_err(|e| anyhow::anyhow!(e))?
+                    .into(),
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content(prompt)
+                    .build()
+                    .map_err(|e| anyhow::anyhow!(e))?
+                    .into(),
+            ])
+            .build()
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        let response = client
+            .chat()
+            .create(request)
+            .await
+            .map_err(|e| anyhow::anyhow!("LLM request failed: {}", e))?;
+
+        let summary = response
+            .choices
+            .first()
+            .and_then(|c| c.message.content.clone())
+            .unwrap_or_default();
+
+        // Store summary in DB
+        let conn = self.get_connection()?;
+        conn.execute(
+            "UPDATE meetings SET summary = ?1 WHERE id = ?2",
+            params![summary, meeting_id],
+        )?;
+
+        let _ = self.app_handle.emit("meeting-summary-generated", meeting_id);
+        info!("Generated summary for meeting {}", meeting_id);
+
+        Ok(summary)
+    }
+
+    // ── Events ─────────────────────────────────────────────────────────────
+
+    fn emit_status_changed(&self, status: MeetingStatus) {
+        let _ = self.app_handle.emit("meeting-status-changed", &status);
+    }
+
+    /// Re-transcribe a completed meeting from its saved audio file.
+    /// Deletes existing segments, reloads the WAV, and re-runs the pipeline.
+    pub async fn retranscribe_meeting(&self, meeting_id: i64) -> Result<()> {
+        use crate::audio_toolkit::load_wav_file;
+
+        let audio_path = self
+            .get_mic_audio_path(meeting_id)?
+            .ok_or_else(|| anyhow::anyhow!("No audio file found for meeting {}", meeting_id))?;
+
+        // Set status to processing
+        {
+            let conn = self.get_connection()?;
+            conn.execute(
+                "UPDATE meetings SET status = ?1 WHERE id = ?2",
+                params![MeetingStatus::Processing.as_str(), meeting_id],
+            )?;
+        }
+        self.emit_status_changed(MeetingStatus::Processing);
+
+        let samples = load_wav_file(&audio_path)
+            .with_context(|| format!("Failed to load audio: {}", audio_path))?;
+
+        if samples.is_empty() {
+            anyhow::bail!("Audio file is empty for meeting {}", meeting_id);
+        }
+
+        // Delete existing segments
+        {
+            let conn = self.get_connection()?;
+            conn.execute(
+                "DELETE FROM meeting_segments WHERE meeting_id = ?1",
+                params![meeting_id],
+            )?;
+        }
+
+        // Re-run transcription (with or without diarization)
+        let app_settings = settings::get_settings(&self.app_handle);
+        let diarization_available = self
+            .app_handle
+            .try_state::<Arc<DiarizationManager>>()
+            .map(|dm| dm.is_available())
+            .unwrap_or(false);
+
+        if app_settings.meeting_diarization_enabled && !diarization_available {
+            // Restore status and bail — don't silently fall back
+            let conn = self.get_connection()?;
+            conn.execute(
+                "UPDATE meetings SET status = ?1 WHERE id = ?2",
+                params![MeetingStatus::Complete.as_str(), meeting_id],
+            )?;
+            self.emit_status_changed(MeetingStatus::Complete);
+            anyhow::bail!("Speaker detection is enabled but diarization models are not downloaded yet. Please wait for the download to finish.");
+        }
+
+        if app_settings.meeting_diarization_enabled && diarization_available {
+            self.diarize_and_transcribe(meeting_id, &samples, AudioSource::Mic)
+                .await;
+        } else {
+            self.transcribe_samples(meeting_id, &samples, "Speaker", AudioSource::Mic)
+                .await;
+        }
+
+        // Mark complete
+        {
+            let conn = self.get_connection()?;
+            conn.execute(
+                "UPDATE meetings SET status = ?1 WHERE id = ?2",
+                params![MeetingStatus::Complete.as_str(), meeting_id],
+            )?;
+        }
+        self.emit_status_changed(MeetingStatus::Complete);
+
+        info!("Meeting {} retranscription complete", meeting_id);
+        Ok(())
+    }
+
+    /// Get the absolute path to a meeting's mic audio file (if it exists).
+    pub fn get_mic_audio_path(&self, meeting_id: i64) -> Result<Option<String>> {
+        let meeting = self.get_meeting(meeting_id)?;
+        match meeting.mic_file_name {
+            Some(ref name) => {
+                let path = self.meetings_dir.join(name);
+                if path.exists() {
+                    Ok(Some(
+                        path.to_str()
+                            .context("Invalid path encoding")?
+                            .to_string(),
+                    ))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+pub fn format_ms_to_hms(ms: i64) -> String {
+    let total_secs = ms / 1000;
+    let h = total_secs / 3600;
+    let m = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+pub fn format_ms_to_srt_time(ms: i64) -> String {
+    let total_secs = ms / 1000;
+    let h = total_secs / 3600;
+    let m = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    let millis = ms % 1000;
+    format!("{:02}:{:02}:{:02},{:03}", h, m, s, millis)
+}
+
+pub fn format_ms_to_vtt_time(ms: i64) -> String {
+    let total_secs = ms / 1000;
+    let h = total_secs / 3600;
+    let m = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    let millis = ms % 1000;
+    format!("{:02}:{:02}:{:02}.{:03}", h, m, s, millis)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    // ── Helper functions ───────────────────────────────────────────────
+
+    fn make_test_db() -> (TempDir, PathBuf) {
+        let temp = TempDir::new().unwrap();
+        let db_path = temp.path().join("test.db");
+        database::initialize_database(&db_path).unwrap();
+        (temp, db_path)
+    }
+
+    fn open_conn(db_path: &PathBuf) -> Connection {
+        let conn = Connection::open(db_path).unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        conn
+    }
+
+    fn insert_meeting(conn: &Connection, title: &str, status: &str) -> i64 {
+        conn.execute(
+            "INSERT INTO meetings (title, start_time, status) VALUES (?1, ?2, ?3)",
+            params![title, 1700000000_i64, status],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    fn insert_segment(
+        conn: &Connection,
+        meeting_id: i64,
+        speaker: &str,
+        start_ms: i64,
+        end_ms: i64,
+        text: &str,
+        source: &str,
+    ) -> i64 {
+        conn.execute(
+            "INSERT INTO meeting_segments (meeting_id, speaker_label, start_ms, end_ms, text, confidence, audio_source) VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6)",
+            params![meeting_id, speaker, start_ms, end_ms, text, source],
+        )
+        .unwrap();
+        conn.last_insert_rowid()
+    }
+
+    // ── Format helpers ─────────────────────────────────────────────────
+
+    #[test]
+    fn format_ms_to_hms_zero() {
+        assert_eq!(format_ms_to_hms(0), "00:00:00");
+    }
+
+    #[test]
+    fn format_ms_to_hms_seconds_only() {
+        assert_eq!(format_ms_to_hms(5_000), "00:00:05");
+    }
+
+    #[test]
+    fn format_ms_to_hms_minutes_and_seconds() {
+        assert_eq!(format_ms_to_hms(125_000), "00:02:05");
+    }
+
+    #[test]
+    fn format_ms_to_hms_hours() {
+        assert_eq!(format_ms_to_hms(3_661_000), "01:01:01");
+    }
+
+    #[test]
+    fn format_ms_to_hms_sub_second_truncated() {
+        // 1500ms = 1.5s → should show 00:00:01 (integer truncation)
+        assert_eq!(format_ms_to_hms(1_500), "00:00:01");
+    }
+
+    #[test]
+    fn format_ms_to_srt_time_zero() {
+        assert_eq!(format_ms_to_srt_time(0), "00:00:00,000");
+    }
+
+    #[test]
+    fn format_ms_to_srt_time_with_millis() {
+        assert_eq!(format_ms_to_srt_time(3_661_456), "01:01:01,456");
+    }
+
+    #[test]
+    fn format_ms_to_srt_time_comma_separator() {
+        // SRT uses commas for milliseconds
+        let result = format_ms_to_srt_time(1_234);
+        assert!(result.contains(','), "SRT times must use comma separator");
+    }
+
+    #[test]
+    fn format_ms_to_vtt_time_zero() {
+        assert_eq!(format_ms_to_vtt_time(0), "00:00:00.000");
+    }
+
+    #[test]
+    fn format_ms_to_vtt_time_with_millis() {
+        assert_eq!(format_ms_to_vtt_time(3_661_456), "01:01:01.456");
+    }
+
+    #[test]
+    fn format_ms_to_vtt_time_dot_separator() {
+        // VTT uses dots for milliseconds
+        let result = format_ms_to_vtt_time(1_234);
+        assert!(result.contains('.'), "VTT times must use dot separator");
+        assert!(!result.contains(','), "VTT must not use comma separator");
+    }
+
+    // ── MeetingStatus ──────────────────────────────────────────────────
+
+    #[test]
+    fn meeting_status_round_trip() {
+        let statuses = [
+            MeetingStatus::Recording,
+            MeetingStatus::Processing,
+            MeetingStatus::Complete,
+            MeetingStatus::Error,
+        ];
+        for status in &statuses {
+            let s = status.as_str();
+            let recovered = MeetingStatus::from_str(s);
+            assert_eq!(*status, recovered);
+        }
+    }
+
+    #[test]
+    fn meeting_status_unknown_maps_to_error() {
+        assert_eq!(MeetingStatus::from_str("unknown"), MeetingStatus::Error);
+        assert_eq!(MeetingStatus::from_str(""), MeetingStatus::Error);
+    }
+
+    #[test]
+    fn meeting_status_serialization() {
+        let json = serde_json::to_string(&MeetingStatus::Recording).unwrap();
+        assert_eq!(json, "\"recording\"");
+
+        let deserialized: MeetingStatus = serde_json::from_str("\"complete\"").unwrap();
+        assert_eq!(deserialized, MeetingStatus::Complete);
+    }
+
+    // ── AudioSource ────────────────────────────────────────────────────
+
+    #[test]
+    fn audio_source_as_str() {
+        assert_eq!(AudioSource::Mic.as_str(), "mic");
+        assert_eq!(AudioSource::System.as_str(), "system");
+    }
+
+    // ── ExportFormat ───────────────────────────────────────────────────
+
+    #[test]
+    fn export_format_serialization() {
+        let json = serde_json::to_string(&ExportFormat::Srt).unwrap();
+        assert_eq!(json, "\"srt\"");
+
+        let md: ExportFormat = serde_json::from_str("\"markdown\"").unwrap();
+        assert!(matches!(md, ExportFormat::Markdown));
+    }
+
+    // ── Database operations (direct SQL, no AppHandle) ─────────────────
+
+    fn table_exists(conn: &Connection, name: &str) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
+            params![name],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap()
+            > 0
+    }
+
+    #[test]
+    fn meeting_tables_created_at_init() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        assert!(table_exists(&conn, "meetings"));
+        assert!(table_exists(&conn, "meeting_segments"));
+    }
+
+    #[test]
+    fn insert_and_query_meeting() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let id = insert_meeting(&conn, "Test Meeting", "recording");
+
+        let title: String = conn
+            .query_row("SELECT title FROM meetings WHERE id = ?1", params![id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(title, "Test Meeting");
+    }
+
+    #[test]
+    fn insert_and_query_segments() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let meeting_id = insert_meeting(&conn, "Seg Test", "complete");
+        insert_segment(&conn, meeting_id, "Alice", 0, 5000, "Hello there", "mic");
+        insert_segment(&conn, meeting_id, "Bob", 5000, 10000, "Hi Alice", "system");
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM meeting_segments WHERE meeting_id = ?1",
+                params![meeting_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn segments_ordered_by_start_ms() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let mid = insert_meeting(&conn, "Order Test", "complete");
+        insert_segment(&conn, mid, "B", 5000, 10000, "Second", "mic");
+        insert_segment(&conn, mid, "A", 0, 5000, "First", "mic");
+
+        let mut stmt = conn
+            .prepare("SELECT text FROM meeting_segments WHERE meeting_id = ?1 ORDER BY start_ms ASC")
+            .unwrap();
+        let texts: Vec<String> = stmt
+            .query_map(params![mid], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(texts, vec!["First", "Second"]);
+    }
+
+    #[test]
+    fn cascade_delete_removes_segments() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let mid = insert_meeting(&conn, "Cascade Test", "complete");
+        insert_segment(&conn, mid, "X", 0, 1000, "Will be deleted", "mic");
+
+        conn.execute("DELETE FROM meetings WHERE id = ?1", params![mid]).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM meeting_segments WHERE meeting_id = ?1",
+                params![mid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0, "Segments must be cascade-deleted with parent meeting");
+    }
+
+    #[test]
+    fn rename_speaker_updates_all_matching_segments() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let mid = insert_meeting(&conn, "Rename Test", "complete");
+        insert_segment(&conn, mid, "Speaker 1", 0, 5000, "Hello", "mic");
+        insert_segment(&conn, mid, "Speaker 1", 5000, 10000, "World", "mic");
+        insert_segment(&conn, mid, "Speaker 2", 10000, 15000, "Other", "system");
+
+        conn.execute(
+            "UPDATE meeting_segments SET speaker_label = ?1 WHERE meeting_id = ?2 AND speaker_label = ?3",
+            params!["Alice", mid, "Speaker 1"],
+        )
+        .unwrap();
+
+        let alice_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM meeting_segments WHERE meeting_id = ?1 AND speaker_label = 'Alice'",
+                params![mid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(alice_count, 2);
+
+        // Speaker 2 should be unchanged
+        let sp2_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM meeting_segments WHERE meeting_id = ?1 AND speaker_label = 'Speaker 2'",
+                params![mid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(sp2_count, 1);
+    }
+
+    #[test]
+    fn list_meetings_ordered_by_start_time_desc() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        conn.execute(
+            "INSERT INTO meetings (title, start_time, status) VALUES (?1, ?2, ?3)",
+            params!["Old Meeting", 1000_i64, "complete"],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO meetings (title, start_time, status) VALUES (?1, ?2, ?3)",
+            params!["New Meeting", 2000_i64, "complete"],
+        )
+        .unwrap();
+
+        let mut stmt = conn
+            .prepare("SELECT title FROM meetings ORDER BY start_time DESC")
+            .unwrap();
+        let titles: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(titles, vec!["New Meeting", "Old Meeting"]);
+    }
+
+    #[test]
+    fn update_meeting_fields() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let mid = insert_meeting(&conn, "Update Test", "recording");
+
+        conn.execute(
+            "UPDATE meetings SET end_time = ?1, duration_ms = ?2, mic_file_name = ?3, status = ?4 WHERE id = ?5",
+            params![1700001000_i64, 60000_i64, "meeting-1-mic.wav", "complete", mid],
+        )
+        .unwrap();
+
+        let (end_time, duration, mic_file, status): (i64, i64, String, String) = conn
+            .query_row(
+                "SELECT end_time, duration_ms, mic_file_name, status FROM meetings WHERE id = ?1",
+                params![mid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+
+        assert_eq!(end_time, 1700001000);
+        assert_eq!(duration, 60000);
+        assert_eq!(mic_file, "meeting-1-mic.wav");
+        assert_eq!(status, "complete");
+    }
+
+    #[test]
+    fn meeting_summary_update() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        let mid = insert_meeting(&conn, "Summary Test", "complete");
+
+        conn.execute(
+            "UPDATE meetings SET summary = ?1 WHERE id = ?2",
+            params!["This is a summary", mid],
+        )
+        .unwrap();
+
+        let summary: String = conn
+            .query_row(
+                "SELECT summary FROM meetings WHERE id = ?1",
+                params![mid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(summary, "This is a summary");
+    }
+
+    #[test]
+    fn foreign_key_constraint_enforced() {
+        let (_tmp, db_path) = make_test_db();
+        let conn = open_conn(&db_path);
+
+        // Attempt to insert a segment for a non-existent meeting
+        let result = conn.execute(
+            "INSERT INTO meeting_segments (meeting_id, speaker_label, start_ms, end_ms, text, audio_source) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![9999_i64, "X", 0_i64, 1000_i64, "orphan", "mic"],
+        );
+
+        assert!(result.is_err(), "Foreign key constraint should prevent orphan segments");
+    }
+
+    // ── Meeting struct serialization ───────────────────────────────────
+
+    #[test]
+    fn meeting_struct_serialization_round_trip() {
+        let meeting = Meeting {
+            id: 1,
+            title: "Test Meeting".to_string(),
+            start_time: 1700000000,
+            end_time: Some(1700001000),
+            duration_ms: Some(60000),
+            mic_file_name: Some("mic.wav".to_string()),
+            system_file_name: None,
+            summary: Some("A good meeting".to_string()),
+            status: MeetingStatus::Complete,
+        };
+
+        let json = serde_json::to_string(&meeting).unwrap();
+        let deserialized: Meeting = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.id, 1);
+        assert_eq!(deserialized.title, "Test Meeting");
+        assert_eq!(deserialized.status, MeetingStatus::Complete);
+        assert_eq!(deserialized.summary, Some("A good meeting".to_string()));
+    }
+
+    #[test]
+    fn meeting_segment_serialization_round_trip() {
+        let seg = MeetingSegment {
+            id: 1,
+            meeting_id: 1,
+            speaker_label: "Alice".to_string(),
+            start_ms: 0,
+            end_ms: 5000,
+            text: "Hello world".to_string(),
+            confidence: Some(0.95),
+            audio_source: "mic".to_string(),
+        };
+
+        let json = serde_json::to_string(&seg).unwrap();
+        let deserialized: MeetingSegment = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.speaker_label, "Alice");
+        assert_eq!(deserialized.text, "Hello world");
+        assert_eq!(deserialized.confidence, Some(0.95));
+    }
+}

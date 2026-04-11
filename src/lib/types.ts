@@ -130,6 +130,12 @@ export const SettingsSchema = z.object({
   input_tracking_excluded_apps: z.array(z.string()).optional().default([]),
   input_tracking_idle_timeout: z.number().nullable().optional().default(2),
   tts_enabled: z.boolean().optional().default(false),
+  meeting_system_audio_enabled: z.boolean().optional().default(false),
+  meeting_system_audio_device: z.string().nullable().optional(),
+  meeting_auto_summary: z.boolean().optional().default(false),
+  meeting_chunk_duration_secs: z.number().optional().default(30),
+  meeting_diarization_enabled: z.boolean().optional().default(false),
+  meeting_diarization_threshold: z.number().optional().default(0.5),
 });
 
 export const BindingResponseSchema = z.object({
@@ -170,3 +176,41 @@ export const FileTranscriptionProgressSchema = z.object({
 export type FileTranscriptionProgress = z.infer<
   typeof FileTranscriptionProgressSchema
 >;
+
+// ── Meeting types ──────────────────────────────────────────────────────
+
+export const MeetingStatusSchema = z.enum([
+  "recording",
+  "processing",
+  "complete",
+  "error",
+]);
+export type MeetingStatus = z.infer<typeof MeetingStatusSchema>;
+
+export const ExportFormatSchema = z.enum(["srt", "vtt", "txt", "markdown"]);
+export type ExportFormat = z.infer<typeof ExportFormatSchema>;
+
+export const MeetingSegmentSchema = z.object({
+  id: z.number(),
+  meeting_id: z.number(),
+  speaker_label: z.string(),
+  start_ms: z.number(),
+  end_ms: z.number(),
+  text: z.string(),
+  confidence: z.number().nullable().optional(),
+  audio_source: z.string(),
+});
+export type MeetingSegment = z.infer<typeof MeetingSegmentSchema>;
+
+export const MeetingSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  start_time: z.number(),
+  end_time: z.number().nullable().optional(),
+  duration_ms: z.number().nullable().optional(),
+  mic_file_name: z.string().nullable().optional(),
+  system_file_name: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  status: MeetingStatusSchema,
+});
+export type Meeting = z.infer<typeof MeetingSchema>;

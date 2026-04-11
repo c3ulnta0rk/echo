@@ -1,8 +1,9 @@
 // Re-export all audio components
 mod decoder;
 mod device;
-mod recorder;
+pub mod recorder;
 mod resampler;
+pub mod system_capture;
 mod utils;
 mod visualizer;
 

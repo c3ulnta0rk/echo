@@ -7,6 +7,7 @@ import {
   Settings2,
   Sparkles,
   Speech,
+  Users,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MeetingPage } from "./meeting/meeting-page";
 import { AboutDialog } from "./settings/about/about-dialog";
 import { AppSettings } from "./settings/app/app-settings";
 import { HistorySettings } from "./settings/history/history-settings";
@@ -69,6 +71,11 @@ export const SECTIONS_CONFIG = {
     label: "Text-to-Speech",
     icon: Speech,
     component: TtsSettingsPage,
+  },
+  meeting: {
+    label: "Meeting",
+    icon: Users,
+    component: MeetingPage,
   },
   "keyboard-tracking": {
     label: "Keyboard",

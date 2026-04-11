@@ -19,15 +19,16 @@ mod startup;
 mod tray;
 mod utils;
 mod wayland;
-mod window_effects;
 
 // Re-export shortcut module from features for convenience
 use features::shortcut;
 
 use env_filter::Builder as EnvFilterBuilder;
 use managers::audio::AudioRecordingManager;
+use managers::diarization::DiarizationManager;
 use managers::history::HistoryManager;
 use managers::input_tracker::InputTrackerManager;
+use managers::meeting::MeetingManager;
 use managers::model::ModelManager;
 use managers::transcription::TranscriptionManager;
 use managers::tts::TtsManager;
@@ -95,6 +96,16 @@ fn initialize_core_logic(app_handle: &AppHandle) {
         log::warn!("Failed to initialize TTS engine on startup: {}", e);
     }
 
+    // Initialize meeting manager
+    let meeting_manager =
+        Arc::new(MeetingManager::new(app_handle).expect("Failed to initialize meeting manager"));
+
+    // Initialize diarization manager
+    let diarization_manager = Arc::new(
+        DiarizationManager::new(app_handle, model_manager.clone())
+            .expect("Failed to initialize diarization manager"),
+    );
+
     // Add managers to Tauri's managed state
     app_handle.manage(recording_manager.clone());
     app_handle.manage(model_manager.clone());
@@ -102,6 +113,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(history_manager.clone());
     app_handle.manage(input_tracker_manager.clone());
     app_handle.manage(tts_manager.clone());
+    app_handle.manage(meeting_manager.clone());
+    app_handle.manage(diarization_manager.clone());
 
     // Start input tracker if enabled in settings
     {
@@ -532,7 +545,6 @@ pub fn run() {
                     let _ = main_window.set_title_bar_style(TitleBarStyle::Transparent);
                 }
 
-                window_effects::apply_window_effects(&main_window);
             }
 
             startup::mark_backend_ready(&app_handle);
@@ -692,6 +704,27 @@ pub fn run() {
             commands::open_log_dir,
             commands::set_log_level,
             features::shortcut::settings::tts::change_tts_enabled_setting,
+            // Meeting settings commands
+            shortcut::settings::meeting::change_meeting_system_audio_setting,
+            shortcut::settings::meeting::change_meeting_system_audio_device_setting,
+            shortcut::settings::meeting::change_meeting_auto_summary_setting,
+            shortcut::settings::meeting::change_meeting_chunk_duration_setting,
+            shortcut::settings::meeting::change_meeting_diarization_setting,
+            shortcut::settings::meeting::get_diarization_status,
+            // Meeting commands
+            commands::meeting::start_meeting,
+            commands::meeting::stop_meeting,
+            commands::meeting::get_meeting_status,
+            commands::meeting::get_meeting,
+            commands::meeting::get_meeting_segments,
+            commands::meeting::list_meetings,
+            commands::meeting::delete_meeting,
+            commands::meeting::generate_meeting_summary,
+            commands::meeting::export_meeting,
+            commands::meeting::rename_meeting_speaker,
+            commands::meeting::is_system_audio_available,
+            commands::meeting::get_meeting_audio_path,
+            commands::meeting::retranscribe_meeting,
             commands::tts::preview_tts,
         ])
         .run(tauri::generate_context!())

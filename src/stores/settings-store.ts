@@ -129,6 +129,18 @@ const settingUpdaters: {
     invoke("change_input_tracking_excluded_apps", { apps: value }),
   tts_enabled: (value) =>
     invoke("change_tts_enabled_setting", { enabled: value }),
+  meeting_system_audio_enabled: (value) =>
+    invoke("change_meeting_system_audio_setting", { enabled: value }),
+  meeting_system_audio_device: (value) =>
+    invoke("change_meeting_system_audio_device_setting", { device: value }),
+  meeting_auto_summary: (value) =>
+    invoke("change_meeting_auto_summary_setting", { enabled: value }),
+  meeting_chunk_duration_secs: (value) =>
+    invoke("change_meeting_chunk_duration_setting", {
+      durationSecs: value,
+    }),
+  meeting_diarization_enabled: (value) =>
+    invoke("change_meeting_diarization_setting", { enabled: value }),
   post_process_enabled: (value) =>
     invoke("change_post_process_enabled_setting", { enabled: value }),
   voice_commands_enabled: (value) =>

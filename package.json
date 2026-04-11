@@ -16,7 +16,8 @@
     "pipeline": "bun run check-types && bun run build",
     "ci:local": "bun run pipeline && cd src-tauri && cargo check",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build": "tauri build",
     "prepare": "husky",
     "version": "bun ./scripts/bump-version.ts",
     "clean": "rm -rf .turbo .cargo node_modules bun.lock dist src-tauri/target apps/web/node_modules && bun install"

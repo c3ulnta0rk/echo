@@ -1,7 +1,10 @@
 pub mod audio;
 pub mod database;
+pub mod diarization;
+pub mod export;
 pub mod history;
 pub mod input_tracker;
+pub mod meeting;
 pub mod model;
 pub mod transcription;
 pub mod tts;

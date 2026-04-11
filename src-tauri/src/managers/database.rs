@@ -17,7 +17,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// Current schema version. Increment this when adding new migrations.
-const CURRENT_SCHEMA_VERSION: u32 = 5;
+const CURRENT_SCHEMA_VERSION: u32 = 6;
 
 /// A database migration with version and SQL statement.
 struct Migration {
@@ -71,6 +71,33 @@ const MIGRATIONS: &[Migration] = &[
         version: 5,
         description: "add_app_pid_column",
         sql: "ALTER TABLE input_entries ADD COLUMN app_pid INTEGER",
+    },
+    Migration {
+        version: 6,
+        description: "create_meetings_tables",
+        sql: "CREATE TABLE meetings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            start_time INTEGER NOT NULL,
+            end_time INTEGER,
+            duration_ms INTEGER,
+            mic_file_name TEXT,
+            system_file_name TEXT,
+            summary TEXT,
+            status TEXT NOT NULL DEFAULT 'recording'
+        );
+        CREATE TABLE meeting_segments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+            speaker_label TEXT NOT NULL,
+            start_ms INTEGER NOT NULL,
+            end_ms INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            confidence REAL,
+            audio_source TEXT NOT NULL DEFAULT 'mic'
+        );
+        CREATE INDEX idx_segments_meeting ON meeting_segments(meeting_id);
+        CREATE INDEX idx_segments_time ON meeting_segments(start_ms)",
     },
 ];
 
@@ -225,7 +252,11 @@ fn detect_schema_version(conn: &Connection) -> Result<u32> {
     let has_post_processed_text =
         check_column_exists(conn, "transcription_history", "post_processed_text")?;
 
-    if has_input_entries && has_app_pid {
+    let has_meetings = check_table_exists(conn, "meetings")?;
+
+    if has_meetings {
+        Ok(6)
+    } else if has_input_entries && has_app_pid {
         Ok(5)
     } else if has_input_entries {
         Ok(4)

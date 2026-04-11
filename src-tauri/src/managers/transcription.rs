@@ -259,6 +259,11 @@ impl TranscriptionManager {
                     })?;
                 LoadedEngine::Parakeet(engine)
             }
+            EngineType::Diarization => {
+                return Err(anyhow::anyhow!(
+                    "Diarization models cannot be used for transcription"
+                ));
+            }
         };
 
         // Update the current engine and model ID
